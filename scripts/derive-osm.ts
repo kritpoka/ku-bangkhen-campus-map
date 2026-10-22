@@ -18,7 +18,11 @@ import type { Feature, FeatureCollection, LineString, MultiPolygon, Point, Polyg
 
 const OSM_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'data', 'osm')
 
-const TREE_SPACING_M = 13
+/** Candidate grid for trees; most candidates are rejected (see scoring below). */
+const TREE_STEP_M = 6
+/** Overall keep rate inside / outside the campus; tuned for ~800 campus trees. */
+const TREE_RATE_IN = 0.29
+const TREE_RATE_OUT = 0.06
 const FADE_GRID = 160
 /** Distance outside the campus over which the surroundings fade out (m). */
 const FADE_DISTANCE_M = 260
@@ -60,6 +64,15 @@ class PolygonIndex {
           this.cells.set(key, list)
         }
     }
+  }
+  /** Distance from p to the nearest polygon edge in the neighbouring cells (Infinity if none). */
+  edgeDistance(p: [number, number]): number {
+    const gx = Math.floor(p[0] / this.size), gy = Math.floor(p[1] / this.size)
+    let best = Infinity
+    for (let dx = -1; dx <= 1; dx++)
+      for (let dy = -1; dy <= 1; dy++)
+        for (const rings of this.cells.get(`${gx + dx},${gy + dy}`) ?? []) best = Math.min(best, distToRings(p, rings))
+    return best
   }
   /** True when p is inside (or within `pad` meters of) any indexed polygon. */
   hit(p: [number, number], pad = 0): boolean {
@@ -147,6 +160,24 @@ function distToRings(p: [number, number], rings: [number, number][][]) {
 const readJson = async <T>(name: string): Promise<T> =>
   JSON.parse(await readFile(join(OSM_DIR, name), 'utf8')) as T
 
+/** Smooth 2D value noise in [0, 1] with the given cell size (m). */
+function valueNoise(cell: number, seed: number) {
+  const h = (i: number, j: number) => {
+    let n = (i * 374761393 + j * 668265263 + seed * 2147483647) | 0
+    n = Math.imul(n ^ (n >>> 13), 1274126177)
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967295
+  }
+  const s = (t: number) => t * t * (3 - 2 * t)
+  return (x: number, y: number) => {
+    const gx = x / cell, gy = y / cell
+    const i = Math.floor(gx), j = Math.floor(gy)
+    const fx = s(gx - i), fy = s(gy - j)
+    const a = h(i, j) + (h(i + 1, j) - h(i, j)) * fx
+    const b = h(i, j + 1) + (h(i + 1, j + 1) - h(i, j + 1)) * fx
+    return a + (b - a) * fy
+  }
+}
+
 export async function derive() {
   const meta = await readJson<{ origin: { lat: number; lng: number }; bbox: number[] }>('meta.json')
   const boundary = await readJson<Feature<Polygon | MultiPolygon>>('boundary.json')
@@ -173,8 +204,13 @@ export async function derive() {
   const roadIdx = new SegmentIndex()
   const halfWidth: Record<string, number> = { main: 4.5, minor: 2.8, path: 1.1 }
   for (const r of roads.features) roadIdx.add(r.geometry.coordinates.map(P.to), halfWidth[r.properties.class] ?? 2)
-  for (const w of water.features)
-    if (w.geometry.type === 'LineString') roadIdx.add((w.geometry as LineString).coordinates.map(P.to), 3)
+  // Canal centrelines (half-width 3 m) and pond/canal polygon shores.
+  const waterIdx = new SegmentIndex()
+  for (const w of water.features) {
+    if (w.geometry.type === 'LineString') waterIdx.add((w.geometry as LineString).coordinates.map(P.to), 3)
+  }
+  for (const rings of projPolys(water.features.filter((f) => f.geometry.type !== 'LineString')))
+    for (const ring of rings) waterIdx.add(ring, 0)
 
   // --- Trees -------------------------------------------------------------
   // Flat array, stride 4: lng, lat, scale (x100), kind (0 round, 1 tall, 2 cone).
@@ -190,17 +226,31 @@ export async function derive() {
 
   const [w, s, e, n] = meta.bbox
   const [x0, y0] = P.to([w, s]), [x1, y1] = P.to([e, n])
+  // Trees cluster in bands: road verges, canal banks and lawn edges, with a
+  // sparse sprinkle inside parks. Low-frequency noise breaks the bands into
+  // clumps and gaps so they don't read as ruled lines.
+  const noise = valueNoise(70, 9137)
+  const band = (d: number, from: number, to: number) => (d < from || d > to ? 0 : 1 - (d - from) / (to - from))
   let inside = 0, outside = 0
-  for (let x = x0; x < x1; x += TREE_SPACING_M)
-    for (let y = y0; y < y1; y += TREE_SPACING_M) {
-      const p: [number, number] = [x + (rand() - 0.5) * TREE_SPACING_M * 0.8, y + (rand() - 0.5) * TREE_SPACING_M * 0.8]
-      const isIn = campus.hit(p)
-      const inGreen = greens.hit(p)
-      // Campus is leafy; surroundings get a light sprinkle that the fade swallows.
-      const keep = isIn ? (inGreen ? 0.85 : 0.55) : inGreen ? 0.35 : 0.07
-      if (rand() > keep) continue
+  for (let x = x0; x < x1; x += TREE_STEP_M)
+    for (let y = y0; y < y1; y += TREE_STEP_M) {
+      const p: [number, number] = [x + (rand() - 0.5) * TREE_STEP_M * 0.9, y + (rand() - 0.5) * TREE_STEP_M * 0.9]
       if (blocked.hit(p, 2.5)) continue
-      if (roadIdx.clearance(p) < 2.2) continue
+      const road = roadIdx.clearance(p)
+      if (road < 2.2) continue
+      const shore = waterIdx.clearance(p)
+      if (shore < 1.5) continue
+      const inGreen = greens.hit(p)
+      const score = Math.max(
+        band(road, 2.2, 7.5),
+        band(shore, 1.5, 9) * 0.9,
+        inGreen ? band(greens.edgeDistance(p), 0, 9) * 0.8 : 0,
+        inGreen ? 0.06 : 0,
+      )
+      if (score === 0) continue
+      const isIn = campus.hit(p)
+      const clump = 0.15 + 1.4 * noise(p[0], p[1])
+      if (rand() > score * clump * (isIn ? TREE_RATE_IN : TREE_RATE_OUT)) continue
       const [lng, lat] = P.from(p)
       const r = rand()
       push(lng, lat, 0.75 + rand() * 0.6, r < 0.72 ? 0 : r < 0.92 ? 1 : 2)

@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  DoorOpen,
   Building2,
   Bus,
   GraduationCap,
@@ -16,10 +17,11 @@ import type { Category } from '../data/types'
  */
 export const categoryStyle: Record<Category, { color: string; icon: LucideIcon }> = {
   faculty: { color: '#006664', icon: GraduationCap },
-  food: { color: '#b45309', icon: UtensilsCrossed },
-  sport: { color: '#1d63c9', icon: Trophy },
-  library: { color: '#6d4fc2', icon: BookOpen },
+  food: { color: '#c2410c', icon: UtensilsCrossed },
+  sport: { color: '#1d4ed8', icon: Trophy },
+  library: { color: '#6d28d9', icon: BookOpen },
   admin: { color: '#475569', icon: Building2 },
   transport: { color: '#a16207', icon: Bus },
-  landmark: { color: '#be3a16', icon: Landmark },
+  landmark: { color: '#b91c1c', icon: Landmark },
+  gate: { color: '#be185d', icon: DoorOpen },
 }

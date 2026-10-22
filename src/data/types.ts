@@ -5,7 +5,7 @@ export interface Localized {
   en: string
 }
 
-export const CATEGORIES = ['faculty', 'food', 'sport', 'library', 'admin', 'transport', 'landmark'] as const
+export const CATEGORIES = ['faculty', 'food', 'sport', 'library', 'admin', 'transport', 'landmark', 'gate'] as const
 export type Category = (typeof CATEGORIES)[number]
 
 export interface LandmarkImage {
@@ -38,6 +38,11 @@ export interface Landmark {
   /** e.g. "way/259685345" or "node/891276459". */
   osmId?: string
   name: Localized
+  /**
+   * Compact name for map labels (labels are never truncated, so keep these
+   * short). The full `name` is shown in the detail panel. Defaults to `name`.
+   */
+  shortName?: Localized
   /** 2–3 short factual sentences per language. */
   description: Localized
   images: LandmarkImage[]

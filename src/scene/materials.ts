@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { withCampusFade, windowBands } from './campusFade'
+import { LANDMARK_FLOOR } from './heights'
 import { palette } from './palette'
 
 /** Lambert keeps the low-poly look cheap on phones. Every material fades outside campus. */
@@ -29,8 +30,12 @@ export const materials = {
   dash: flat(palette.dash),
   // Lane lines sit on top of modelled (depth-writing) surfaces.
   lane: lambert(palette.trim, { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }),
-  // Plain blocks get per-vertex colors (lighter roofs) from the geometry.
-  building: lambert('#ffffff', { vertexColors: true }),
+  // Plain blocks get per-vertex colors (lighter roofs) from the geometry. The
+  // emissive lift keeps their shaded walls from going dark, so they recede and
+  // the detailed landmarks carry the contrast.
+  building: lambert('#ffffff', { vertexColors: true, emissive: '#5a5c58' }),
+  landmarkPad: flat(palette.landmarkPad),
+  outline: new THREE.LineBasicMaterial({ color: palette.outline, transparent: true, opacity: 0.55 }),
 
   // Detailed landmarks (these write depth, unlike the flat ground layers)
   trackSolid: lambert(palette.track),
@@ -38,7 +43,7 @@ export const materials = {
   poolSolid: lambert(palette.pool),
   wall: withCampusFade(
     new THREE.MeshLambertMaterial({ color: palette.wall }),
-    windowBands(palette.glass),
+    windowBands(palette.glass, LANDMARK_FLOOR),
     '-windows',
   ),
   wallPlain: lambert(palette.wall),

@@ -1,8 +1,8 @@
 import * as THREE from 'three'
 import type { Feature, Polygon, MultiPolygon } from 'geojson'
-import { buildings, sport } from '../data/osm'
+import { buildings, roads, sport } from '../data/osm'
 import { landmarks } from '../data/landmarks'
-import { toScene } from '../lib/geo'
+import { project, toScene } from '../lib/geo'
 import {
   hipRoof,
   loft,
@@ -15,16 +15,24 @@ import {
   ribbons,
   stripToPositionNormal,
 } from './geometry'
-import { buildingHeight } from './heights'
+import { buildingHeight, HEIGHT_SCALE, LANDMARK_BOOST } from './heights'
 import { landmarkModels, type BuildingStyle, type ModelSpec } from './modelSpecs'
 
-const FLOOR = 3.6
-
 /** Geometry buckets, one merged mesh (and material) each. */
-export type Bucket = 'wall' | 'wallPlain' | 'roof' | 'roofDark' | 'trim' | 'plinth' | 'statue' | 'stone' | 'track' | 'pitch' | 'pool' | 'lane'
+export type Bucket =
+  | 'wall' | 'wallPlain' | 'roof' | 'roofDark' | 'trim' | 'plinth' | 'statue' | 'stone'
+  | 'track' | 'pitch' | 'pool' | 'lane' | 'pad'
+
+/** Buckets whose silhouettes get crisp outline edges. */
+const OUTLINED: Bucket[] = ['wall', 'wallPlain', 'roof', 'roofDark', 'trim', 'stone']
+
+/** Ground highlight margin around each landmark (m). */
+const PAD = 7
 
 export interface LandmarkModelsResult {
   buckets: Partial<Record<Bucket, THREE.BufferGeometry>>
+  /** Feature-edge lines for the modelled landmarks (one LineSegments). */
+  edges: THREE.BufferGeometry
   /** Height of each modelled landmark's tallest point, for pin placement. */
   tops: Map<string, number>
 }
@@ -52,7 +60,7 @@ export function buildLandmarkModels(): LandmarkModelsResult {
 
   const buckets: LandmarkModelsResult['buckets'] = {}
   for (const [k, list] of Object.entries(parts)) buckets[k as Bucket] = mergeParts(list!)
-  return { buckets, tops }
+  return { buckets, tops, edges: outlineEdges(buckets) }
 }
 
 function buildModel(id: string, spec: ModelSpec, add: (b: Bucket, g: THREE.BufferGeometry) => void): number {
@@ -66,8 +74,10 @@ function buildModel(id: string, spec: ModelSpec, add: (b: Bucket, g: THREE.Buffe
           continue
         }
         const levels = parseFloat(f.properties['building:levels'] ?? '') || spec.levels
-        const h = levels ? levels * FLOOR + 1 : buildingHeight(f)
-        top = Math.max(top, building(outerRing(f), h, spec.style, add))
+        const h = (levels ? (levels * 3.6 + 1) * HEIGHT_SCALE : buildingHeight(f)) * LANDMARK_BOOST
+        const ring = outerRing(f)
+        add('pad', prism(offsetRing(ring, PAD), [], 0, 0.04))
+        top = Math.max(top, building(ring, h, spec.style, add))
       }
       return top
     }
@@ -77,6 +87,8 @@ function buildModel(id: string, spec: ModelSpec, add: (b: Bucket, g: THREE.Buffe
       return pool(spec.deck, spec.pools, add)
     case 'monument':
       return monument(id, spec.facing, add)
+    case 'gate':
+      return gate(id, spec.width, add)
   }
 }
 
@@ -93,7 +105,7 @@ function building(
   switch (style) {
     case 'modern': {
       add('plinth', prism(offsetRing(ring, 0.35), [], 0, 1.2))
-      add('wall', prism(ring, [], 0, h, 0.3))
+      add('wall', prism(ring, [], 0, h))
       const inner = offsetRing(ring, -0.8)
       add('trim', prism(offsetRing(ring, 0.15), [inner], h - 0.2, h + 1.1))
       add('roof', prism(inner, [], h - 0.2, h + 0.35))
@@ -105,7 +117,7 @@ function building(
     case 'hip':
     case 'hall': {
       add('plinth', prism(offsetRing(ring, 0.35), [], 0, 1.2))
-      add(style === 'hip' ? 'wall' : 'wallPlain', prism(ring, [], 0, h, 0.25))
+      add(style === 'hip' ? 'wall' : 'wallPlain', prism(ring, [], 0, h))
       const eave = offsetRing(ring, 1.2)
       add('roofDark', prism(eave, [], h, h + 0.5))
       const rise = short * (style === 'hip' ? 0.3 : 0.16)
@@ -115,7 +127,7 @@ function building(
     case 'thai': {
       // Two-tier steep roof with a wide lower skirt, after Thai civic halls.
       add('plinth', prism(offsetRing(ring, 1.5), [], 0, 1.6))
-      add('wall', prism(ring, [], 0, h, 0.25))
+      add('wall', prism(ring, [], 0, h))
       const eave = offsetRing(ring, 2.2)
       const shoulder = offsetRing(ring, 0.2)
       add('roofDark', prism(eave, [], h, h + 0.4))
@@ -156,6 +168,7 @@ function stadium(stadiumId: string, pitchId: string, add: (b: Bucket, g: THREE.B
   const box = orientedBox(pitch)
   // Running track: a ring around the pitch.
   const trackOuter = offsetRing(pitch, 9)
+  add('pad', prism(offsetRing(pitch, 9 + 26), [], 0, 0.04))
   add('track', prism(trackOuter, [pitch], 0, 0.22))
   add('pitch', prism(pitch, [], 0, 0.25))
   // Lane lines on the track.
@@ -183,7 +196,10 @@ function stadium(stadiumId: string, pitchId: string, add: (b: Bucket, g: THREE.B
 
 function pool(deckId: string, poolIds: string[], add: (b: Bucket, g: THREE.BufferGeometry) => void): number {
   const deck = buildingById.get(deckId)
-  if (deck) add('plinth', prism(outerRing(deck), [], 0, 0.5))
+  if (deck) {
+    add('pad', prism(offsetRing(outerRing(deck), PAD), [], 0, 0.04))
+    add('plinth', prism(outerRing(deck), [], 0, 0.5))
+  }
   for (const pid of poolIds) {
     const f = sportById.get(pid)
     if (!f) continue
@@ -212,6 +228,7 @@ function monument(id: string, facingId: string, add: (b: Bucket, g: THREE.Buffer
   // Line the statues up parallel to the building behind them.
   const axis = behind ? orientedBox(outerRing(behind)) : { cos: 1, sin: 0 }
   // Exaggerated ~1.8x so the group reads at campus scale.
+  add('pad', orientedBlock(c, axis.cos, axis.sin, 22 + PAD * 2, 11 + PAD * 2, 0, 0.04))
   add('stone', orientedBlock(c, axis.cos, axis.sin, 22, 11, 0, 0.6))
   for (const u of [-6.5, 0, 6.5]) {
     const p = offsetAlong(c, axis.cos, axis.sin, u)
@@ -226,7 +243,72 @@ function monument(id: string, facingId: string, add: (b: Bucket, g: THREE.Buffer
   return 8.5
 }
 
+/**
+ * A gateway across the road that enters campus at the gate: two pillars, a
+ * lintel with a KU-green roof, and a guard booth on each side.
+ */
+function gate(id: string, width: number, add: (b: Bucket, g: THREE.BufferGeometry) => void): number {
+  const l = landmarks.find((x) => x.id === id)
+  if (!l) return 0
+  const c = project(l.coordinates.lng, l.coordinates.lat)
+  const dir = nearestRoadDirection(c)
+  // The gate spans across the road: its long axis is perpendicular to it.
+  const cos = -dir[1], sin = dir[0]
+  const half = width / 2
+  const ph = 10 * LANDMARK_BOOST
+  add('pad', orientedBlock(c, cos, sin, width + 16 + PAD * 2, 8 + PAD * 2, 0, 0.04))
+  for (const side of [-1, 1]) {
+    add('trim', orientedBlock(offsetAlong(c, cos, sin, side * half), cos, sin, 3.2, 3.2, 0, ph))
+    // Guard booth.
+    const booth = offsetAlong(c, cos, sin, side * (half + 6))
+    add('wallPlain', orientedBlock(booth, cos, sin, 5, 5, 0, 4.5))
+    add('roof', hipRoof(boxRing(booth, cos, sin, 6.6, 6.6), 4.5, 2.2, 3.3))
+  }
+  add('trim', orientedBlock(c, cos, sin, width + 4, 3.6, ph, ph + 1.8))
+  add('roof', hipRoof(boxRing(c, cos, sin, width + 7, 6.5), ph + 1.8, 3.4, 3.25))
+  return ph + 5.2
+}
+
+/** Unit direction (east, north) of the on-campus road nearest to p (the entrance road, not the street outside). */
+function nearestRoadDirection(p: [number, number]): [number, number] {
+  let best = Infinity
+  let dir: [number, number] = [1, 0]
+  for (const r of roads.features) {
+    if (r.properties.class === 'path' || !r.properties.inside) continue
+    const pts = r.geometry.coordinates.map(([lng, lat]) => project(lng, lat))
+    for (let i = 1; i < pts.length; i++) {
+      const [ax, ay] = pts[i - 1], [bx, by] = pts[i]
+      const dx = bx - ax, dy = by - ay
+      const l2 = dx * dx + dy * dy || 1
+      const t = Math.max(0, Math.min(1, ((p[0] - ax) * dx + (p[1] - ay) * dy) / l2))
+      const d = Math.hypot(p[0] - (ax + t * dx), p[1] - (ay + t * dy))
+      if (d < best) {
+        best = d
+        const len = Math.sqrt(l2)
+        dir = [dx / len, dy / len]
+      }
+    }
+  }
+  return dir
+}
+
+/** Crisp feature lines (creases > 25°) for the solid landmark buckets. */
+function outlineEdges(buckets: LandmarkModelsResult['buckets']): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = []
+  for (const b of OUTLINED) {
+    const g = buckets[b]
+    if (g) parts.push(new THREE.EdgesGeometry(g, 25))
+  }
+  return parts.length ? mergeParts(parts) : new THREE.BufferGeometry()
+}
+
 // ─── helpers ───────────────────────────────────────────────────────────────
+
+function boxRing(c: [number, number], cos: number, sin: number, length: number, width: number): [number, number][] {
+  const hl = length / 2, hw = width / 2
+  return [[-hl, -hw], [hl, -hw], [hl, hw], [-hl, hw]].map(([u, v]) => [c[0] + u * cos - v * sin, c[1] + u * sin + v * cos])
+}
+
 
 /** Axis-aligned-in-its-own-frame box centered on c (projected east/north). */
 function orientedBlock(

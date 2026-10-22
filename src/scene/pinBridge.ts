@@ -11,6 +11,8 @@ export const pinBridge = {
   selectedId: null as string | null,
   /** Screen areas covered by floating UI (CSS px); pins there are hidden. */
   insets: { top: 0, right: 0, bottom: 0, left: 0 },
+  /** Camera distance that frames the whole campus; label budgets scale from it. */
+  fitDistance: 3000,
   /** Set when something other than the camera changed (language, selection, new elements). */
   dirty: true,
   invalidate: () => {},

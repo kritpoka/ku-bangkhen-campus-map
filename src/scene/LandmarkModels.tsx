@@ -8,12 +8,25 @@ const CASTS: Partial<Record<Bucket, boolean>> = {
   wall: true, wallPlain: true, roof: true, roofDark: true, trim: true, plinth: true, statue: true, stone: true,
 }
 
-/** Model buckets that share a color with a flat ground layer but must write depth. */
-const MATERIAL: Partial<Record<Bucket, THREE.Material>> = {
+/** Material per bucket (solid variants for surfaces that sit on top of other geometry). */
+const MATERIAL: Record<Bucket, THREE.Material> = {
+  wall: materials.wall,
+  wallPlain: materials.wallPlain,
+  roof: materials.roof,
+  roofDark: materials.roofDark,
+  trim: materials.trim,
+  plinth: materials.plinth,
+  statue: materials.statue,
+  stone: materials.stone,
+  lane: materials.lane,
   track: materials.trackSolid,
   pitch: materials.pitchSolid,
   pool: materials.poolSolid,
+  pad: materials.landmarkPad,
 }
+
+/** Pads are a ground layer: drawn depth-free between the lawns and the roads (see BaseLayers). */
+export const PAD_RENDER_ORDER = -96.5
 
 /** All detailed landmark buildings, merged into one mesh per material. */
 export function LandmarkModels({ models }: { models: LandmarkModelsResult }) {
@@ -24,11 +37,13 @@ export function LandmarkModels({ models }: { models: LandmarkModelsResult }) {
         <mesh
           key={bucket}
           geometry={geometry}
-          material={MATERIAL[bucket] ?? materials[bucket]}
+          material={MATERIAL[bucket]}
+          renderOrder={bucket === 'pad' ? PAD_RENDER_ORDER : 0}
           castShadow={!!CASTS[bucket]}
           receiveShadow
         />
       ))}
+      <lineSegments geometry={models.edges} material={materials.outline} />
     </group>
   )
 }

@@ -16,9 +16,13 @@ export const palette = {
   roadOutside: '#f4f6f4',
   path: '#f6f4ee',
   dash: '#f0c75e',
-  building: '#e3e8e3',
-  buildingRoof: '#f5f7f4',
-  buildingOutside: '#e6eae7',
+  // Plain blocks recede: light, desaturated, low contrast.
+  building: '#f1f2ee',
+  buildingRoof: '#fafaf7',
+  buildingOutside: '#eef0ec',
+  // Soft ground highlight under detailed landmarks.
+  landmarkPad: '#d9eedf',
+  outline: '#1d4f45',
 
   // Landmarks
   kuGreen: '#006664',

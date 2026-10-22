@@ -13,6 +13,8 @@ export type ModelSpec =
   | { kind: 'stadium'; stadium: string; pitch: string }
   | { kind: 'pool'; deck: string; pools: string[] }
   | { kind: 'monument'; facing: string }
+  /** A gateway across the road nearest the landmark's coordinates; width in meters. */
+  | { kind: 'gate'; width: number }
 
 export const landmarkModels: Record<string, ModelSpec> = {
   auditorium: { kind: 'building', style: 'thai', buildings: ['way/259685345'], levels: 3 },
@@ -27,8 +29,8 @@ export const landmarkModels: Record<string, ModelSpec> = {
   'fac-business': { kind: 'building', style: 'modern', buildings: ['way/544276176'], levels: 8 },
   'canteen-1': { kind: 'building', style: 'canopy', buildings: ['way/389998960'] },
   'ku-avenue': { kind: 'building', style: 'modern', buildings: ['way/389998800'], levels: 2 },
-  'fac-vet': { kind: 'building', style: 'modern', buildings: ['way/123190415'], levels: 4 },
-  'vet-hospital': { kind: 'building', style: 'modern', buildings: ['way/123201557'], levels: 4 },
+  'lecture-hall-1': { kind: 'building', style: 'modern', buildings: ['way/173271563'] },
+  'gate-ngamwongwan-1': { kind: 'gate', width: 22 },
   stadium: { kind: 'stadium', stadium: 'way/1313552698', pitch: 'way/115810001' },
   'swimming-pool': {
     kind: 'pool',

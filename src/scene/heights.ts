@@ -3,8 +3,25 @@ import type { BuildingProps } from '../data/osm'
 
 const LEVEL_HEIGHT = 3.6
 
-/** Building height in meters from OSM tags, with sensible defaults per type. */
+/**
+ * Vertical exaggeration for every building. Real heights read as flat at
+ * campus scale; 1.5x makes massing legible at the overview zoom.
+ */
+export const HEIGHT_SCALE = 1.5
+
+/** Extra height for detailed landmarks so they dominate the plain blocks. */
+export const LANDMARK_BOOST = 1.15
+
+/** Rendered storey height on detailed landmarks (drives the window bands). */
+export const LANDMARK_FLOOR = 3.6 * HEIGHT_SCALE * LANDMARK_BOOST
+
+/** Rendered building height (m): OSM-derived height times HEIGHT_SCALE. */
 export function buildingHeight(f: Feature): number {
+  return realHeight(f) * HEIGHT_SCALE
+}
+
+/** Building height in meters from OSM tags, with sensible defaults per type. */
+function realHeight(f: Feature): number {
   const p = f.properties as BuildingProps
   const h = parseFloat(p.height ?? '')
   if (Number.isFinite(h) && h > 0) return h

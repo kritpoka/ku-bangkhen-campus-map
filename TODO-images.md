@@ -10,10 +10,10 @@ To add your own photo:
 
 | id | Landmark | Category |
 |---|---|---|
-| `gate-phahonyothin-1` | ประตูพหลโยธิน 1 / Phahonyothin Gate 1 | landmark |
-| `gate-ngamwongwan-1` | ประตูงามวงศ์วาน 1 / Ngamwongwan Gate 1 | landmark |
-| `gate-ngamwongwan-3` | ประตูงามวงศ์วาน 3 / Ngamwongwan Gate 3 | landmark |
-| `gate-vibhavadi` | ประตูวิภาวดีรังสิต / Vibhavadi Rangsit Gate | landmark |
+| `gate-phahonyothin-1` | ประตูพหลโยธิน 1 / Phahonyothin Gate 1 | gate |
+| `gate-ngamwongwan-1` | ประตูงามวงศ์วาน 1 / Ngamwongwan Gate 1 | gate |
+| `gate-ngamwongwan-3` | ประตูงามวงศ์วาน 3 / Ngamwongwan Gate 3 | gate |
+| `gate-vibhavadi` | ประตูวิภาวดีรังสิต / Vibhavadi Rangsit Gate | gate |
 | `hexagonal-pavilion` | ศาลาหกเหลี่ยม / Hexagonal Pavilion | landmark |
 | `chakrabandh-pensiri` | อาคารจักรพันธ์เพ็ญศิริ / Chakrabandhu Pensiri Hall | landmark |
 | `hall-of-history` | หอประวัติมหาวิทยาลัยเกษตรศาสตร์ / KU Hall of History | landmark |

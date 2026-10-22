@@ -2,6 +2,7 @@ import { memo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Landmark } from '../data/types'
 import type { Lang } from '../i18n'
+import { labelText } from '../scene/Pins'
 import { pinBridge } from '../scene/pinBridge'
 import { categoryStyle } from './categories'
 
@@ -13,7 +14,7 @@ interface PinLayerProps {
 
 /**
  * Landmark pins as plain DOM over the canvas. Position and display mode
- * (data-mode = label | icon | hidden) are written by PinProjector, so this
+ * (data-mode = label | dot | hidden) are written by PinProjector, so this
  * component only re-renders for language or selection changes.
  */
 export function PinLayer({ landmarks, selectedId = null, onSelect }: PinLayerProps) {
@@ -47,7 +48,6 @@ const Pin = memo(function Pin({
   onSelect?: (id: string) => void
 }) {
   const { color, icon: Icon } = categoryStyle[landmark.category]
-  const name = landmark.name[lang]
   return (
     <div
       ref={(el) => {
@@ -62,15 +62,16 @@ const Pin = memo(function Pin({
       inert
       className="group/pin absolute top-0 left-0 transition-opacity duration-200 will-change-transform data-[mode=hidden]:opacity-0 motion-reduce:transition-none"
     >
+      {/* Anchored at the bottom centre (the dot sits on the landmark). */}
       <button
         type="button"
         onClick={() => onSelect?.(landmark.id)}
-        aria-label={name}
+        aria-label={landmark.name[lang]}
         aria-pressed={selected}
-        className="group pointer-events-auto flex -translate-x-1/2 -translate-y-full cursor-pointer flex-col items-center outline-none select-none"
+        className="group pointer-events-auto absolute bottom-0 left-0 flex -translate-x-1/2 translate-y-[5px] cursor-pointer group-data-[mode=dot]/pin:translate-y-[13px] flex-col items-center outline-none select-none group-data-[mode=dot]/pin:p-[7px]"
       >
         <span
-          className={`flex h-8 items-center gap-1.5 rounded-full bg-white/95 p-1 shadow-md shadow-ku-900/15 ring-1 ring-black/5 transition-transform group-hover:-translate-y-0.5 group-focus-visible:ring-2 group-focus-visible:ring-ku-600 group-data-[mode=label]/pin:pr-3 motion-reduce:transition-none ${
+          className={`hidden h-8 items-center gap-1.5 rounded-full bg-white/95 py-1 pr-3 pl-1 shadow-md shadow-ku-900/15 ring-1 ring-black/5 transition-transform group-hover:-translate-y-0.5 group-focus-visible:ring-2 group-focus-visible:ring-ku-600 group-data-[mode=label]/pin:flex motion-reduce:transition-none ${
             selected ? 'ring-2 ring-ku-600' : ''
           }`}
         >
@@ -80,16 +81,21 @@ const Pin = memo(function Pin({
           >
             <Icon className="size-3.5" strokeWidth={2.4} aria-hidden />
           </span>
-          {/* leading-normal: tighter line heights clip stacked Thai tone marks under truncate. */}
-          <span
-            lang={lang}
-            className="hidden max-w-[11rem] truncate text-[12.5px] leading-normal font-semibold text-slate-800 group-data-[mode=label]/pin:block"
-          >
-            {name}
+          {/* Never truncated: labels use the short name. leading-normal keeps Thai tone marks intact. */}
+          <span lang={lang} className="text-[12.5px] leading-normal font-semibold whitespace-nowrap text-slate-800">
+            {labelText(landmark, lang)}
           </span>
         </span>
-        <span className="h-3 w-0.5 rounded-full" style={{ backgroundColor: color }} aria-hidden />
-        <span className="size-2 rounded-full ring-2 ring-white" style={{ backgroundColor: color }} aria-hidden />
+        <span
+          className="hidden h-[14px] w-0.5 rounded-full group-data-[mode=label]/pin:block"
+          style={{ backgroundColor: color }}
+          aria-hidden
+        />
+        <span
+          className="block size-3 rounded-full shadow-sm ring-2 ring-white transition-transform group-hover:scale-125 group-focus-visible:ring-ku-600 group-data-[mode=label]/pin:size-2.5 motion-reduce:transition-none"
+          style={{ backgroundColor: color }}
+          aria-hidden
+        />
       </button>
     </div>
   )

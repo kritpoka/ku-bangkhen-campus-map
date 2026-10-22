@@ -8,6 +8,7 @@ import { landmarks } from '../data/landmarks'
 import { BaseLayers } from './BaseLayers'
 import { LandmarkModels, buildLandmarkModels } from './LandmarkModels'
 import { PinProjector } from './Pins'
+import { pinBridge } from './pinBridge'
 import { Trees } from './Trees'
 import { palette } from './palette'
 import { pinHeights } from './pinAnchors'
@@ -30,8 +31,12 @@ const CAMPUS = (() => {
 
 /** Camera target may drift this far (m) past the campus edge. */
 const PAN_MARGIN = 120
-/** Default view direction: from the south-south-east, about 50° above the horizon. */
-const VIEW_DIR = new THREE.Vector3(Math.sin(0.35), 1.15, Math.cos(0.35)).normalize()
+/** Default view: from the south-south-east, ~42° above the ground (near-isometric). */
+const DEFAULT_ELEVATION = THREE.MathUtils.degToRad(42)
+const VIEW_DIR = new THREE.Vector3(Math.sin(0.35), Math.tan(DEFAULT_ELEVATION), Math.cos(0.35)).normalize()
+/** Users may tilt between ~54° (more top-down) and ~28° above the ground. */
+const MIN_POLAR = THREE.MathUtils.degToRad(90 - 54)
+const MAX_POLAR = THREE.MathUtils.degToRad(90 - 28)
 const VFOV = 32
 
 /** Distance at which the whole campus fits the viewport at the given aspect. */
@@ -41,7 +46,7 @@ export function fitDistance(aspect: number) {
   // The campus is diamond-shaped, so its bounding box corners are empty. On
   // portrait screens, fill the width and let the top and bottom tips crop
   // slightly rather than shrinking the whole campus to a speck.
-  const r = CAMPUS.radius * (aspect < 1 ? 0.6 : 0.78)
+  const r = CAMPUS.radius * (aspect < 1 ? 0.6 : 0.62)
   return r / Math.sin(Math.min(v, h) / 2)
 }
 
@@ -57,6 +62,8 @@ function CameraRig({ controls }: { controls: React.RefObject<OrbitControlsImpl |
     if (!c) return
     const d = fitDistance(size.width / size.height)
     c.maxDistance = d * 1.35
+    pinBridge.fitDistance = d
+    pinBridge.touch()
     if (!fitted.current) {
       c.target.copy(CAMPUS.center)
       camera.position.copy(CAMPUS.center).addScaledVector(VIEW_DIR, d)
@@ -103,38 +110,47 @@ function CameraRig({ controls }: { controls: React.RefObject<OrbitControlsImpl |
  * Sun direction (toward the light) and a shadow frustum that follows the view.
  * Light from the west so shadows fall to the right of buildings in the default
  * south-facing view, like the reference. Lighting is tuned for no tone mapping:
- * lit roofs land at ~1.0 (true palette colors) and shade at ~0.7. Three's
- * Lambert divides light by PI, hence hemisphere 0.7π and sun 0.3π / sin(elev).
+ * lit roofs land at ~1.0 (true palette colors) and shade at ~0.55, for crisp,
+ * readable shadows. Three's Lambert divides light by PI, hence hemisphere
+ * 0.55π and sun 0.45π / sin(elev).
  */
 const SUN = new THREE.Vector3(-1, 1.1, 0.15).normalize()
 
 function Sun({ controls }: { controls: React.RefObject<OrbitControlsImpl | null> }) {
   const light = useRef<THREE.DirectionalLight>(null)
   const lastHalf = useRef(0)
-  const { camera } = useThree()
+  const lastTarget = useRef(new THREE.Vector3(NaN, NaN, NaN))
+  const { camera, invalidate } = useThree()
   useFrame(() => {
     const l = light.current, c = controls.current
     if (!l || !c) return
     const t = c.target
+    // This may run before the controls update this frame; if the sun had to
+    // move, render one more frame so the resting view gets correct shadows.
+    if (!lastTarget.current.equals(t)) {
+      lastTarget.current.copy(t)
+      invalidate()
+    }
     l.target.position.copy(t)
     l.position.copy(t).addScaledVector(SUN, 1500)
     l.target.updateMatrixWorld()
     // Tighter shadow box when zoomed in = sharper shadows for the same map size.
     const dist = camera.position.distanceTo(t)
-    const half = THREE.MathUtils.clamp(dist * 0.7, 220, 1300)
+    const half = THREE.MathUtils.clamp(dist * 0.6, 160, 1300)
     if (Math.abs(half - lastHalf.current) / half > 0.08) {
       const cam = l.shadow.camera
       cam.left = cam.bottom = -half
       cam.right = cam.top = half
       cam.updateProjectionMatrix()
       lastHalf.current = half
+      invalidate()
     }
   })
   const mapSize = isCoarse ? 2048 : 4096
   return (
     <directionalLight
       ref={light}
-      intensity={1.3}
+      intensity={1.92}
       color="#fffaf0"
       castShadow
       shadow-mapSize={[mapSize, mapSize]}
@@ -142,7 +158,7 @@ function Sun({ controls }: { controls: React.RefObject<OrbitControlsImpl | null>
       shadow-camera-far={3500}
       shadow-bias={-0.0003}
       shadow-normalBias={0.15}
-      shadow-radius={2.5}
+      shadow-radius={1}
     />
   )
 }
@@ -155,7 +171,7 @@ function Scene() {
   return (
     <>
       <color attach="background" args={[palette.sky]} />
-      <hemisphereLight args={['#ffffff', '#d4ddd6', 2.2]} />
+      <hemisphereLight args={['#ffffff', '#d4ddd6', 1.73]} />
       <Sun controls={controls} />
       <BaseLayers />
       <Trees shadows />
@@ -167,7 +183,8 @@ function Scene() {
         enableDamping
         dampingFactor={0.09}
         minDistance={90}
-        maxPolarAngle={1.22}
+        minPolarAngle={MIN_POLAR}
+        maxPolarAngle={MAX_POLAR}
         screenSpacePanning={false}
         mouseButtons={{ LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }}
         touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}

@@ -50,7 +50,7 @@ const raw: Landmark[] = [
   // ─── Gates ───────────────────────────────────────────────────────────────
   {
     id: 'gate-phahonyothin-1',
-    category: 'landmark',
+    category: 'gate',
     coordinates: { lat: 13.841536, lng: 100.576401 },
     coordSource: 'osm',
     osmId: 'node/10275199705',
@@ -66,7 +66,8 @@ const raw: Landmark[] = [
   },
   {
     id: 'gate-ngamwongwan-1',
-    category: 'landmark',
+    category: 'gate',
+    featured: true,
     coordinates: { lat: 13.842212, lng: 100.571391 },
     coordSource: 'osm',
     osmId: 'node/10275257609',
@@ -81,7 +82,7 @@ const raw: Landmark[] = [
   },
   {
     id: 'gate-ngamwongwan-3',
-    category: 'landmark',
+    category: 'gate',
     coordinates: { lat: 13.845228, lng: 100.566001 },
     coordSource: 'osm',
     osmId: 'node/10275199707',
@@ -96,11 +97,12 @@ const raw: Landmark[] = [
   },
   {
     id: 'gate-vibhavadi',
-    category: 'landmark',
+    category: 'gate',
     coordinates: { lat: 13.852381, lng: 100.564654 },
     coordSource: 'osm',
     osmId: 'node/10275199706',
     name: { th: 'ประตูวิภาวดีรังสิต', en: 'Vibhavadi Rangsit Gate' },
+    shortName: { th: 'ประตูวิภาวดีรังสิต', en: 'Vibhavadi Gate' },
     description: {
       th: 'ประตูฝั่งถนนวิภาวดีรังสิต ทางทิศตะวันตกเฉียงเหนือของวิทยาเขต',
       en: 'The gate on Vibhavadi Rangsit Road, at the north-west of campus.',
@@ -140,6 +142,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'node/891276459',
     name: { th: 'อนุสาวรีย์สามบูรพาจารย์', en: 'Three Founders Monument' },
+    shortName: { th: 'สามบูรพาจารย์', en: 'Three Founders' },
     description: {
       th: 'อนุสาวรีย์ของหลวงสุวรรณวาจกกสิกิจ หลวงอิงคศรีกสิการ และพระช่วงเกษตรศิลปการ ผู้วางรากฐานการเกษตรและการศึกษาด้านการเกษตรของไทย หรือที่รู้จักกันในชื่อ "สามเสือเกษตร" ตั้งอยู่หน้าอาคารสถาบันเกษตราธิการ',
       en: 'Statues of Luang Suvarnavachakakasikij, Luang Ingasrikasikan and Phra Chuangkasetsilapakan, who laid the foundations of Thai agriculture and agricultural education, nicknamed the "Three Tigers of Kaset". It stands in front of the Kasetrathikarn Institute building.',
@@ -176,6 +179,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'way/157198880',
     name: { th: 'อาคารจักรพันธ์เพ็ญศิริ', en: 'Chakrabandhu Pensiri Hall' },
+    shortName: { th: 'อาคารจักรพันธ์ฯ', en: 'Chakrabandhu Hall' },
     description: {
       th: 'อาคารอเนกประสงค์ขนาดประมาณ 3,000 ที่นั่ง สร้างเมื่อปี 2528 เดิมเป็นโรงยิมอเนกประสงค์ ปัจจุบันใช้จัดพิธีพระราชทานปริญญาบัตร งานกิจกรรมของมหาวิทยาลัย และเป็นสถานที่รับสมัครสอบเข้ามหาวิทยาลัย',
       en: 'A multipurpose hall seating about 3,000, built in 1985 and originally a sports hall. It now hosts degree ceremonies, university events and admissions registration.',
@@ -191,6 +195,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'way/94728856',
     name: { th: 'หอประวัติมหาวิทยาลัยเกษตรศาสตร์', en: 'KU Hall of History' },
+    shortName: { th: 'หอประวัติ มก.', en: 'KU History Hall' },
     description: {
       th: 'พิพิธภัณฑ์ประวัติของมหาวิทยาลัย ตั้งอยู่ใกล้ KU Home และร้านสหกรณ์มหาวิทยาลัยเกษตรศาสตร์',
       en: "The university's history museum, near KU Home and the KU Co-operative Store.",
@@ -207,6 +212,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'node/891253823',
     name: { th: 'สำนักพิพิธภัณฑ์และวัฒนธรรมการเกษตร', en: 'Office of Agricultural Museum and Culture' },
+    shortName: { th: 'พิพิธภัณฑ์เกษตรฯ', en: 'Ag Museum' },
     description: {
       th: 'หน่วยงานพิพิธภัณฑ์ด้านการเกษตรของมหาวิทยาลัย ตั้งอยู่ทางด้านตะวันตกของวิทยาเขต ใกล้เขตหอพักนิสิตหญิง',
       en: "The university's agricultural museum office, on the west side of campus near the women's dormitories.",
@@ -226,6 +232,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'way/403121488',
     name: { th: 'อาคารสารนิเทศ 50 ปี', en: 'KU Golden Jubilee Administration and Information Center' },
+    shortName: { th: 'อาคารสารนิเทศ 50 ปี', en: 'Golden Jubilee Bldg' },
     description: {
       th: 'อาคารสูง 10 ชั้น สร้างเนื่องในโอกาสครบรอบ 50 ปีของมหาวิทยาลัย เริ่มใช้งานในปี 2540 เป็นที่ตั้งของหน่วยงานบริหารส่วนกลางและสำนักงานอธิการบดี',
       en: "A 10-storey building marking the university's 50th anniversary, in use since 1997. It houses the central administration and the Office of the President.",
@@ -241,6 +248,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'way/123189159',
     name: { th: 'สถานพยาบาล มหาวิทยาลัยเกษตรศาสตร์', en: 'KU Infirmary' },
+    shortName: { th: 'สถานพยาบาล มก.', en: 'KU Infirmary' },
     description: {
       th: 'สถานพยาบาลของมหาวิทยาลัย ให้บริการตรวจรักษาโรคทั่วไป ฉีดวัคซีน ทำแผล ทันตกรรม กายภาพบำบัด และให้คำปรึกษาด้านสุขภาพจิต ตรวจสอบเวลาเปิดบริการล่าสุดกับสถานพยาบาลก่อนไป',
       en: "The university's health service: general medical care, vaccinations, wound care, dentistry, physical therapy and mental-health advice. Check current opening hours before you go.",
@@ -253,11 +261,11 @@ const raw: Landmark[] = [
   {
     id: 'vet-hospital',
     category: 'admin',
-    featured: true,
     coordinates: { lat: 13.844348, lng: 100.577522 },
     coordSource: 'osm',
     osmId: 'way/589746727',
     name: { th: 'โรงพยาบาลสัตว์ มหาวิทยาลัยเกษตรศาสตร์ บางเขน', en: 'KU Veterinary Teaching Hospital, Bangkhen' },
+    shortName: { th: 'รพ.สัตว์ มก.', en: 'KU Vet Hospital' },
     description: {
       th: 'โรงพยาบาลสัตว์ของคณะสัตวแพทยศาสตร์ รักษาสุนัข แมว กระต่าย และสัตว์เลี้ยงชนิดพิเศษบางชนิด มีหน่วยคลินิก 21 หน่วย และเป็นที่ฝึกปฏิบัติของนิสิตสัตวแพทย์ ที่นี่ยังมี "สระสุวรรณชาด" สระธาราบำบัดสำหรับสุนัขที่มีปัญหาข้อ กระดูก และระบบประสาท',
       en: 'The Faculty of Veterinary Medicine’s teaching hospital treats mainly dogs, cats and rabbits, plus some exotic pets, across 21 clinical departments. It also has the Suwannachat Pool, a hydrotherapy pool for dogs with joint, bone and nerve conditions.',
@@ -320,6 +328,7 @@ const raw: Landmark[] = [
   {
     id: 'lecture-hall-1',
     category: 'library',
+    featured: true,
     coordinates: { lat: 13.847153, lng: 100.57095 },
     coordSource: 'osm',
     osmId: 'way/173271563',
@@ -357,6 +366,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'node/891270840',
     name: { th: 'คณะเกษตร', en: 'Faculty of Agriculture' },
+    shortName: { th: 'คณะเกษตร', en: 'Agriculture' },
     description: {
       th: 'คณะเกษตรก่อตั้งเมื่อ 2 กุมภาพันธ์ 2486 วันเดียวกับการสถาปนามหาวิทยาลัยเกษตรศาสตร์ ตั้งอยู่กลางวิทยาเขต ใกล้คณะมนุษยศาสตร์และสำนักหอสมุด',
       en: 'Founded on 2 February 1943, the same day as the university itself. It sits in the middle of campus near the Faculty of Humanities and the KU Library.',
@@ -373,6 +383,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'way/75719557',
     name: { th: 'คณะวิศวกรรมศาสตร์', en: 'Faculty of Engineering' },
+    shortName: { th: 'คณะวิศวกรรมศาสตร์', en: 'Engineering' },
     description: {
       th: 'มีจุดเริ่มต้นจากโรงเรียนช่างชลประทานในปี 2481 เป็นคณะวิศวกรรมชลประทานในเครือมหาวิทยาลัยในปี 2497 และเป็นคณะวิศวกรรมศาสตร์ในปี 2509 ในพื้นที่คณะมีอาคาร 4 ที่เรียกกันว่า "หัวลำโพง"',
       en: 'It began as the Irrigation School in 1938, became the Faculty of Irrigation Engineering under the university in 1954 and the Faculty of Engineering in 1966. Its buildings include Building 4, nicknamed "Hua Lamphong".',
@@ -389,6 +400,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'way/75496098',
     name: { th: 'คณะวิทยาศาสตร์', en: 'Faculty of Science' },
+    shortName: { th: 'คณะวิทยาศาสตร์', en: 'Science' },
     description: {
       th: 'ก่อตั้งเมื่อ 9 มีนาคม 2509 พื้นที่คณะมีอาคารปฏิบัติการวิทยาศาสตร์กายภาพ 45 ปี (SC45) อาคารศูนย์วิจัยวิทยาศาสตร์จุฬาภรณ์ 60 พรรษา และอาคารพิพิธภัณฑ์สัตววิทยา',
       en: 'Founded on 9 March 1966. Its buildings include the 45th Anniversary Physical Science Building (SC45), the Princess Chulabhorn Science Research Center and the Zoological Museum.',
@@ -404,6 +416,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'way/239146929',
     name: { th: 'ภาควิชาวิทยาการคอมพิวเตอร์ (อาคาร SC45)', en: 'Department of Computer Science (SC45)' },
+    shortName: { th: 'วิทยาการคอมฯ SC45', en: 'Comp Sci · SC45' },
     description: {
       th: 'ภาควิชาวิทยาการคอมพิวเตอร์ คณะวิทยาศาสตร์ อยู่ที่ชั้น 7 ของอาคารปฏิบัติการวิทยาศาสตร์กายภาพ 45 ปี (SC45) ซึ่งเป็นอาคารสูง 12 ชั้น',
       en: 'The Faculty of Science’s Computer Science department is on the 7th floor of the 12-storey 45th Anniversary Physical Science Building (SC45).',
@@ -420,6 +433,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'node/1374641597',
     name: { th: 'คณะเศรษฐศาสตร์', en: 'Faculty of Economics' },
+    shortName: { th: 'คณะเศรษฐศาสตร์', en: 'Economics' },
     description: {
       th: 'วิกิพีเดียระบุวันก่อตั้งคือ 2 กุมภาพันธ์ 2486 พร้อมการสถาปนามหาวิทยาลัย ตั้งอยู่ทางด้านใต้ของวิทยาเขต ติดกับคณะบริหารธุรกิจ',
       en: 'Thai Wikipedia gives its founding date as 2 February 1943, alongside the university. It is on the south side of campus next to the Faculty of Business Administration.',
@@ -437,6 +451,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'node/1374579868',
     name: { th: 'คณะบริหารธุรกิจ', en: 'Faculty of Business Administration' },
+    shortName: { th: 'คณะบริหารธุรกิจ', en: 'Business Admin.' },
     description: {
       th: 'เริ่มต้นเป็นส่วนหนึ่งของคณะเศรษฐศาสตร์และบริหารธุรกิจเมื่อ 9 มีนาคม 2509 และแยกเป็นคณะบริหารธุรกิจเมื่อ 18 ธันวาคม 2535 ตั้งอยู่ทางด้านใต้ของวิทยาเขต ติดกับคณะเศรษฐศาสตร์',
       en: 'It started within the Faculty of Economics and Business Administration on 9 March 1966 and became a separate faculty on 18 December 1992. It is on the south side of campus next to the Faculty of Economics.',
@@ -452,6 +467,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'node/891270814',
     name: { th: 'คณะสังคมศาสตร์', en: 'Faculty of Social Sciences' },
+    shortName: { th: 'คณะสังคมศาสตร์', en: 'Social Sciences' },
     description: {
       th: 'ก่อตั้งเมื่อ 7 มีนาคม 2517 ตั้งอยู่กลางวิทยาเขต ใกล้ศูนย์เรียนรวม 2–4 และคณะศึกษาศาสตร์',
       en: 'Founded on 7 March 1974. It is in the middle of campus near Lecture Halls 2–4 and the Faculty of Education.',
@@ -467,6 +483,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'way/544276189',
     name: { th: 'คณะมนุษยศาสตร์', en: 'Faculty of Humanities' },
+    shortName: { th: 'คณะมนุษยศาสตร์', en: 'Humanities' },
     description: {
       th: 'ก่อตั้งเมื่อ 17 มิถุนายน 2524 ตั้งอยู่ใกล้คณะเกษตรและกลุ่มศูนย์เรียนรวม 2–4',
       en: 'Founded on 17 June 1981. It is near the Faculty of Agriculture and Lecture Halls 2–4.',
@@ -483,6 +500,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'node/891270838',
     name: { th: 'คณะศึกษาศาสตร์', en: 'Faculty of Education' },
+    shortName: { th: 'คณะศึกษาศาสตร์', en: 'Education' },
     description: {
       th: 'ก่อตั้งเมื่อ 28 พฤศจิกายน 2512 พื้นที่คณะมีอาคาร 1–4 คณะศึกษาศาสตร์ ตั้งอยู่ทางเหนือของคณะสังคมศาสตร์',
       en: 'Founded on 28 November 1969. Its Buildings 1–4 sit just north of the Faculty of Social Sciences.',
@@ -498,6 +516,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'way/75498137',
     name: { th: 'คณะประมง', en: 'Faculty of Fisheries' },
+    shortName: { th: 'คณะประมง', en: 'Fisheries' },
     description: {
       th: 'ก่อตั้งเมื่อ 2 กุมภาพันธ์ 2486 พร้อมการสถาปนามหาวิทยาลัย ตั้งอยู่ทางเหนือสุดของวิทยาเขต ใกล้คณะสิ่งแวดล้อม และมีพิพิธภัณฑ์สัตว์น้ำบางเขนอยู่ในพื้นที่',
       en: 'Founded on 2 February 1943, alongside the university. It is at the northern end of campus near the Faculty of Environment, and includes the Bangkhen Aquatic Animal Museum.',
@@ -514,6 +533,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'way/589880230',
     name: { th: 'คณะวนศาสตร์', en: 'Faculty of Forestry' },
+    shortName: { th: 'คณะวนศาสตร์', en: 'Forestry' },
     description: {
       th: 'มีจุดเริ่มต้นจากโรงเรียนป่าไม้ที่จังหวัดแพร่ ซึ่งเปิดสอนครั้งแรกเมื่อ 1 พฤษภาคม 2479 เป็นคณะวนศาสตร์เมื่อปี 2486 และย้ายมาที่บางเขนในปี 2499',
       en: 'It grew out of the Forestry School in Phrae, which first opened on 1 May 1936. It became the Faculty of Forestry in 1943 and moved to Bangkhen in 1956.',
@@ -529,6 +549,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'way/1098693403',
     name: { th: 'คณะสถาปัตยกรรมศาสตร์', en: 'Faculty of Architecture' },
+    shortName: { th: 'คณะสถาปัตยกรรมศาสตร์', en: 'Architecture' },
     description: {
       th: 'เริ่มจากภาควิชาสถาปัตยกรรมศาสตร์ในคณะวิศวกรรมศาสตร์เมื่อปี 2537 และตั้งเป็นคณะเมื่อ 1 มกราคม 2543 ตั้งอยู่ทางด้านเหนือของวิทยาเขต ใกล้อาคารสารนิเทศ 50 ปี',
       en: 'It began as the Department of Architecture within the Faculty of Engineering in 1994 and became a faculty on 1 January 2000. It is in the north of campus near the Golden Jubilee building.',
@@ -544,6 +565,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'node/891270839',
     name: { th: 'คณะอุตสาหกรรมเกษตร', en: 'Faculty of Agro-Industry' },
+    shortName: { th: 'คณะอุตสาหกรรมเกษตร', en: 'Agro-Industry' },
     description: {
       th: 'ก่อตั้งเมื่อ 23 พฤษภาคม 2523 ตั้งอยู่ทางด้านตะวันออกเฉียงเหนือของวิทยาเขต ใกล้โรงอาหารกลาง 2',
       en: 'Founded on 23 May 1980. It is in the north-east of campus near KU Canteen 2.',
@@ -555,11 +577,11 @@ const raw: Landmark[] = [
   {
     id: 'fac-vet',
     category: 'faculty',
-    featured: true,
     coordinates: { lat: 13.844551, lng: 100.577273 },
     coordSource: 'osm',
     osmId: 'way/589752219',
     name: { th: 'คณะสัตวแพทยศาสตร์', en: 'Faculty of Veterinary Medicine' },
+    shortName: { th: 'คณะสัตวแพทยศาสตร์', en: 'Veterinary Medicine' },
     description: {
       th: 'ก่อตั้งเมื่อ 28 ธันวาคม 2497 ตั้งอยู่ฝั่งตรงข้ามถนนพหลโยธินจากวิทยาเขตหลัก ติดกับคณะเทคนิคการสัตวแพทย์ และมีโรงพยาบาลสัตว์ของมหาวิทยาลัยอยู่ในพื้นที่คณะ',
       en: 'Founded on 28 December 1954. It is across Phahonyothin Road from the main campus, next to the Faculty of Veterinary Technology, and includes the university’s veterinary teaching hospital.',
@@ -627,6 +649,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'way/1313552698',
     name: { th: 'สนามอินทรีจันทรสถิตย์', en: 'Inseechandrasatitya Stadium' },
+    shortName: { th: 'สนามอินทรีฯ', en: 'Insee Stadium' },
     description: {
       th: 'สนามกีฬาหลักของมหาวิทยาลัย ใช้แข่งฟุตบอล กรีฑา และวอลเลย์บอลชายหาด และเป็นสนามเหย้าของสโมสรฟุตบอลเกษตรศาสตร์',
       en: "The university's main stadium, used for football, athletics and beach volleyball, and the home ground of Kasetsart F.C.",
@@ -644,6 +667,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'way/530953469',
     name: { th: 'สระว่ายน้ำจุฬาภรณ์วลัยลักษณ์', en: 'Chulabhorn Walailak Swimming Pool' },
+    shortName: { th: 'สระว่ายน้ำจุฬาภรณ์ฯ', en: 'Chulabhorn Pool' },
     description: {
       th: 'ศูนย์ว่ายน้ำของมหาวิทยาลัย มี 4 สระ ได้แก่ สระแข่งขันมาตรฐานขนาด 50 × 25 เมตร สระกระโดดลึก 5 เมตร สระฝึกในร่มสำหรับผู้เริ่มต้น และสระฝึกซ้อมสำหรับนักกีฬา เปิดให้บุคคลทั่วไปใช้บริการด้วย',
       en: "The university's aquatic center has four pools: a 50 × 25 m competition pool, a 5 m deep diving pool, covered beginners' pools and a training pool for competitive swimmers. It is open to the general public.",
