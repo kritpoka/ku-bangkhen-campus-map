@@ -13,5 +13,41 @@
   },
   "attribution": {
     "osm": "© ผู้ร่วมให้ข้อมูล OpenStreetMap"
+  },
+  "category": {
+    "faculty": "คณะ",
+    "food": "อาหาร",
+    "sport": "กีฬา",
+    "library": "ห้องสมุดและที่เรียน",
+    "admin": "หน่วยงานและบริการ",
+    "transport": "การเดินทาง",
+    "landmark": "สถานที่สำคัญ",
+    "gate": "ประตู"
+  },
+  "panel": {
+    "close": "ปิด",
+    "focus": "ซูมไปที่สถานที่นี้",
+    "openInMaps": "เปิดใน Google Maps",
+    "openInMapsHint": "(เปิดในแท็บใหม่)",
+    "expand": "ขยายรายละเอียด",
+    "collapse": "ย่อรายละเอียด",
+    "photoBy": "ภาพ: {{author}}",
+    "license": "สัญญาอนุญาต {{license}}",
+    "source": "ที่มา",
+    "noPhoto": "ยังไม่มีรูปภาพ",
+    "noPhotoHint": "เราจะเพิ่มรูปภาพที่ใช้ได้อย่างถูกต้องเร็ว ๆ นี้",
+    "photoCount": "รูปที่ {{index}} จาก {{count}}",
+    "photos": "รูปภาพ",
+    "category": "หมวดหมู่",
+    "coordinates": "พิกัด",
+    "sources": "แหล่งข้อมูล",
+    "details": "รายละเอียดสถานที่"
+  },
+  "controls": {
+    "label": "ควบคุมแผนที่",
+    "zoomIn": "ซูมเข้า",
+    "zoomOut": "ซูมออก",
+    "home": "กลับไปมุมมองทั้งวิทยาเขต",
+    "compass": "หันทิศเหนือขึ้นและรีเซ็ตมุมเอียง"
   }
 }

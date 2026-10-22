@@ -9,6 +9,7 @@ import { BaseLayers } from './BaseLayers'
 import { LandmarkModels, buildLandmarkModels } from './LandmarkModels'
 import { PinProjector } from './Pins'
 import { pinBridge } from './pinBridge'
+import { mapCamera } from './camera/mapCamera'
 import { Trees } from './Trees'
 import { palette } from './palette'
 import { pinHeights } from './pinAnchors'
@@ -31,9 +32,9 @@ const CAMPUS = (() => {
 
 /** Camera target may drift this far (m) past the campus edge. */
 const PAN_MARGIN = 120
-/** Default view: from the south-south-east, ~42° above the ground (near-isometric). */
+/** Default view: north up, ~42° above the ground (near-isometric). */
 const DEFAULT_ELEVATION = THREE.MathUtils.degToRad(42)
-const VIEW_DIR = new THREE.Vector3(Math.sin(0.35), Math.tan(DEFAULT_ELEVATION), Math.cos(0.35)).normalize()
+const DEFAULT_POLAR = Math.PI / 2 - DEFAULT_ELEVATION
 /** Users may tilt between ~54° (more top-down) and ~28° above the ground. */
 const MIN_POLAR = THREE.MathUtils.degToRad(90 - 54)
 const MAX_POLAR = THREE.MathUtils.degToRad(90 - 28)
@@ -56,17 +57,38 @@ function CameraRig({ controls }: { controls: React.RefObject<OrbitControlsImpl |
   const { camera, size, invalidate, get } = useThree()
   const fitted = useRef(false)
 
-  // Frame the campus on first load and whenever the viewport aspect changes a lot.
+  // Hand the camera to the shared map-camera controller (touch gestures, animations, UI).
+  useEffect(() => {
+    const c = controls.current
+    if (!c) return
+    mapCamera.attach({ camera: camera as THREE.PerspectiveCamera, controls: c, invalidate, getSize: () => get().size })
+    mapCamera.defaultPolar = DEFAULT_POLAR
+    return () => mapCamera.detach()
+  }, [camera, controls, invalidate, get])
+
+  // Frame the campus on first load; refresh limits whenever the viewport changes.
   useEffect(() => {
     const c = controls.current
     if (!c) return
     const d = fitDistance(size.width / size.height)
     c.maxDistance = d * 1.35
+    mapCamera.limits = {
+      minDistance: c.minDistance,
+      maxDistance: c.maxDistance,
+      minPolar: MIN_POLAR,
+      maxPolar: MAX_POLAR,
+      bounds: {
+        minX: CAMPUS.minX - PAN_MARGIN,
+        maxX: CAMPUS.maxX + PAN_MARGIN,
+        minZ: CAMPUS.minZ - PAN_MARGIN,
+        maxZ: CAMPUS.maxZ + PAN_MARGIN,
+      },
+    }
+    mapCamera.home = { target: CAMPUS.center.clone(), distance: d, azimuth: 0, polar: DEFAULT_POLAR }
     pinBridge.fitDistance = d
     pinBridge.touch()
     if (!fitted.current) {
-      c.target.copy(CAMPUS.center)
-      camera.position.copy(CAMPUS.center).addScaledVector(VIEW_DIR, d)
+      mapCamera.write(mapCamera.home)
       c.update()
       fitted.current = true
     }
@@ -79,21 +101,21 @@ function CameraRig({ controls }: { controls: React.RefObject<OrbitControlsImpl |
     ;(window as unknown as { __kuMap: unknown }).__kuMap = {
       fit: () => fitDistance(size.width / size.height),
       three: get,
-      view(x: number, z: number, d: number, az = 0.35, polar = 0.9) {
-        const c = controls.current
-        if (!c) return
-        c.target.set(x, 0, z)
-        camera.position.set(x + d * Math.sin(polar) * Math.sin(az), d * Math.cos(polar), z + d * Math.sin(polar) * Math.cos(az))
-        c.update()
-        invalidate()
+      camera: mapCamera,
+      pins: pinBridge,
+      view(x: number, z: number, d: number, az = 0, polar = DEFAULT_POLAR) {
+        mapCamera.write({ target: new THREE.Vector3(x, 0, z), distance: d, azimuth: az, polar })
+        controls.current?.update()
       },
     }
   }, [camera, controls, invalidate, size.width, size.height, get])
 
-  // Keep the target over campus. Runs only while rendering (frameloop="demand").
+  // Keep the target over campus (desktop controls; touch gestures rubber-band
+  // and settle on their own). Runs only while rendering (frameloop="demand").
   useFrame(() => {
+    mapCamera.publish()
     const c = controls.current
-    if (!c) return
+    if (!c || mapCamera.active) return
     const t = c.target
     const cx = THREE.MathUtils.clamp(t.x, CAMPUS.minX - PAN_MARGIN, CAMPUS.maxX + PAN_MARGIN)
     const cz = THREE.MathUtils.clamp(t.z, CAMPUS.minZ - PAN_MARGIN, CAMPUS.maxZ + PAN_MARGIN)
@@ -186,8 +208,8 @@ function Scene() {
         minPolarAngle={MIN_POLAR}
         maxPolarAngle={MAX_POLAR}
         screenSpacePanning={false}
+        // Desktop only: touch input is handled by camera/touchGestures.ts and never reaches these controls.
         mouseButtons={{ LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }}
-        touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
       />
       <CameraRig controls={controls} />
     </>

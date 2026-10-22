@@ -1,0 +1,43 @@
+import { chromium } from 'playwright-core'
+const URL = process.env.MAP_URL ?? 'http://localhost:5179/'
+const browser = await chromium.launch({ channel: 'chrome', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] })
+const page = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage()
+const errors = []; page.on('pageerror', (e) => errors.push(e.message))
+await page.goto(URL, { waitUntil: 'networkidle' })
+await page.waitForFunction(() => window.__kuMap?.camera?.home)
+await page.evaluate(() => window.__kuMap.three().setDpr(0.5))
+await page.waitForTimeout(800)
+const st = () => page.evaluate(() => { const s = window.__kuMap.camera.read(); return { x: s.target.x, z: s.target.z, d: s.distance } })
+const url = () => page.evaluate(() => new URL(location.href).searchParams.get('place'))
+const res = []; const check = (n, ok, d = '') => { res.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? '  — ' + d : ''}`) }
+let a = await st()
+await page.mouse.move(640, 500); await page.mouse.down(); await page.mouse.move(640, 380, { steps: 8 }); await page.mouse.up()
+await page.waitForTimeout(800); let b = await st()
+check('mouse left-drag pans (OrbitControls)', Math.hypot(b.x - a.x, b.z - a.z) > 30, `moved ${Math.hypot(b.x - a.x, b.z - a.z).toFixed(0)} m`)
+a = b; for (let i = 0; i < 4; i++) { await page.mouse.wheel(0, -200); await page.waitForTimeout(120) } await page.waitForTimeout(800); b = await st()
+check('mouse wheel zooms', b.d < a.d * 0.9, `${a.d.toFixed(0)} → ${b.d.toFixed(0)}`)
+const pinAt = () => page.evaluate(() => { for (const el of document.querySelectorAll('[data-mode=label]')) { const m = /translate3d\(([-\d.]+)px, ([-\d.]+)px/.exec(el.style.transform); return { x: +m[1], y: +m[2] - 30, id: el.querySelector('button').getAttribute('aria-label') } } })
+let p = await pinAt(); await page.mouse.click(p.x, p.y); await page.waitForTimeout(1500)
+const sel = await url()
+check('click on a pin selects it and opens the card', !!sel && await page.locator('aside h2').isVisible(), sel ?? '')
+await page.mouse.move(300, 650); await page.mouse.down(); await page.mouse.up(); await page.waitForTimeout(300)
+check('click on empty map closes the card', (await url()) === null)
+p = await pinAt(); await page.mouse.click(p.x, p.y); await page.waitForTimeout(1200)
+await page.keyboard.press('Escape'); await page.waitForTimeout(200)
+check('Escape closes the card', (await url()) === null)
+// Wheel and drag over a pin label still reach the map.
+p = await pinAt(); a = await st()
+await page.mouse.move(p.x, p.y); for (let i = 0; i < 4; i++) { await page.mouse.wheel(0, -200); await page.waitForTimeout(120) }
+await page.waitForTimeout(600); b = await st()
+check('wheel over a pin label zooms the map', b.d < a.d * 0.9, `${a.d.toFixed(0)} → ${b.d.toFixed(0)}`)
+p = await pinAt(); a = await st()
+await page.mouse.move(p.x, p.y); await page.mouse.down(); await page.mouse.move(p.x + 150, p.y + 60, { steps: 8 }); await page.mouse.up(); await page.waitForTimeout(600); b = await st()
+check('drag starting on a pin pans and does not select', Math.hypot(b.x - a.x, b.z - a.z) > 10 && (await url()) === null)
+// Keyboard: Tab to a pin and press Enter.
+await page.keyboard.press('Tab'); await page.keyboard.press('Tab'); await page.keyboard.press('Tab')
+for (let i = 0; i < 12; i++) { if (await page.evaluate(() => !!document.activeElement?.closest('[data-mode]'))) break; await page.keyboard.press('Tab') }
+await page.keyboard.press('Enter'); await page.waitForTimeout(1200)
+check('keyboard: Tab to a pin + Enter selects it', !!(await url()), await url() ?? '')
+check('no page errors', errors.length === 0, errors.join(' | '))
+console.log(`${res.filter(Boolean).length}/${res.length} passed`)
+await browser.close()

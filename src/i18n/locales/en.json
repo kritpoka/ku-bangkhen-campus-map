@@ -13,5 +13,41 @@
   },
   "attribution": {
     "osm": "© OpenStreetMap contributors"
+  },
+  "category": {
+    "faculty": "Faculty",
+    "food": "Food",
+    "sport": "Sport",
+    "library": "Library & study",
+    "admin": "Offices & services",
+    "transport": "Transport",
+    "landmark": "Landmark",
+    "gate": "Gate"
+  },
+  "panel": {
+    "close": "Close",
+    "focus": "Zoom to this place",
+    "openInMaps": "Open in Google Maps",
+    "openInMapsHint": "(opens in a new tab)",
+    "expand": "Expand details",
+    "collapse": "Collapse details",
+    "photoBy": "Photo: {{author}}",
+    "license": "{{license}}",
+    "source": "Source",
+    "noPhoto": "No photo yet",
+    "noPhotoHint": "An openly licensed photo will be added soon.",
+    "photoCount": "Photo {{index}} of {{count}}",
+    "photos": "Photos",
+    "category": "Category",
+    "coordinates": "Coordinates",
+    "sources": "Sources",
+    "details": "Place details"
+  },
+  "controls": {
+    "label": "Map controls",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "home": "Show the whole campus",
+    "compass": "Face north and reset tilt"
   }
 }

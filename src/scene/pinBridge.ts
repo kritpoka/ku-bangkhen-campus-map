@@ -13,6 +13,11 @@ export const pinBridge = {
   insets: { top: 0, right: 0, bottom: 0, left: 0 },
   /** Camera distance that frames the whole campus; label budgets scale from it. */
   fitDistance: 3000,
+  /**
+   * Landmark id at a screen point (CSS px, map-relative), or null. Labels hit
+   * on their chip; dots get a generous touch radius. Set by PinProjector.
+   */
+  hitTest: (_x: number, _y: number): string | null => null,
   /** Set when something other than the camera changed (language, selection, new elements). */
   dirty: true,
   invalidate: () => {},

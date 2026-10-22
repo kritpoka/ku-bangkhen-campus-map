@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "fetch-osm": "tsx scripts/fetch-osm.ts",
-    "derive-osm": "tsx scripts/derive-osm.ts"
+    "derive-osm": "tsx scripts/derive-osm.ts",
+    "test:touch": "node tests/e2e/gestures.mjs",
+    "test:desktop": "node tests/e2e/desktop.mjs",
+    "test:webkit": "node tests/e2e/webkit.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
@@ -31,6 +34,7 @@
     "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^6.1.2",
     "osmtogeojson": "^3.0.0-beta.5",
+    "playwright-core": "^1.64.1",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",

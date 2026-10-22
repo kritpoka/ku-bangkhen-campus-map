@@ -17,6 +17,8 @@ const CHIP_H = 32
 const STEM_H = 14
 const LABEL_PAD = 44 // icon + gaps + horizontal padding
 const LABEL_GAP = 4 // breathing room between neighbouring labels
+/** Touch radius around a dot (CSS px); dots are small, fingers are not. */
+const DOT_HIT_RADIUS = 24
 
 /**
  * Label budget by zoom, as a fraction of the distance that frames the whole
@@ -83,6 +85,35 @@ export function PinProjector({ landmarks, heights }: { landmarks: Landmark[]; he
     }),
     [landmarks, heights],
   )
+
+  // Tap targets for the touch gesture handler (pins also have their own buttons for mouse/keyboard).
+  useEffect(() => {
+    pinBridge.hitTest = (x, y) => {
+      let best: string | null = null
+      let bestD = DOT_HIT_RADIUS
+      landmarks.forEach((l, i) => {
+        const mode = s.modes[i]
+        if (mode === 'hidden') return
+        const sx = s.screen[i * 2], sy = s.screen[i * 2 + 1]
+        if (mode === 'label') {
+          const w = s.widths[i]
+          if (x >= sx - w / 2 && x <= sx + w / 2 && y >= sy - STEM_H - CHIP_H && y <= sy + 6) {
+            best = l.id
+            bestD = -1
+          }
+        }
+        const d = Math.hypot(x - sx, y - sy)
+        if (d < bestD) {
+          best = l.id
+          bestD = d
+        }
+      })
+      return best
+    }
+    return () => {
+      pinBridge.hitTest = () => null
+    }
+  }, [landmarks, s])
 
   useFrame(({ camera }) => {
     // useFrame runs before the renderer refreshes matrices; use this frame's pose.

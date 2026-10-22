@@ -16,6 +16,11 @@ interface PinLayerProps {
  * Landmark pins as plain DOM over the canvas. Position and display mode
  * (data-mode = label | dot | hidden) are written by PinProjector, so this
  * component only re-renders for language or selection changes.
+ *
+ * Pins are pointer-transparent: mouse and touch input always reaches the map
+ * (so dragging or scrolling over a label still pans/zooms), and pointer
+ * selection goes through pinBridge.hitTest in App. The buttons remain for
+ * keyboard and screen-reader users.
  */
 export function PinLayer({ landmarks, selectedId = null, onSelect }: PinLayerProps) {
   const { i18n } = useTranslation()
@@ -68,7 +73,7 @@ const Pin = memo(function Pin({
         onClick={() => onSelect?.(landmark.id)}
         aria-label={landmark.name[lang]}
         aria-pressed={selected}
-        className="group pointer-events-auto absolute bottom-0 left-0 flex -translate-x-1/2 translate-y-[5px] cursor-pointer group-data-[mode=dot]/pin:translate-y-[13px] flex-col items-center outline-none select-none group-data-[mode=dot]/pin:p-[7px]"
+        className="group absolute bottom-0 left-0 flex -translate-x-1/2 translate-y-[5px] cursor-pointer group-data-[mode=dot]/pin:translate-y-[13px] flex-col items-center outline-none select-none group-data-[mode=dot]/pin:p-[7px]"
       >
         <span
           className={`hidden h-8 items-center gap-1.5 rounded-full bg-white/95 py-1 pr-3 pl-1 shadow-md shadow-ku-900/15 ring-1 ring-black/5 transition-transform group-hover:-translate-y-0.5 group-focus-visible:ring-2 group-focus-visible:ring-ku-600 group-data-[mode=label]/pin:flex motion-reduce:transition-none ${
