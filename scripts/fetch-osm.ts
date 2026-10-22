@@ -14,6 +14,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import osmtogeojson from 'osmtogeojson'
 import * as turf from '@turf/turf'
+import { derive } from './derive-osm.ts'
 import type {
   Feature,
   FeatureCollection,
@@ -21,12 +22,17 @@ import type {
   LineString,
   MultiPolygon,
   Polygon,
-  Position,
 } from 'geojson'
 
 const OVERPASS_URL = process.env.OVERPASS_URL ?? 'https://overpass-api.de/api/interpreter'
-/** OSM way tagged amenity=university, name=มหาวิทยาลัยเกษตรศาสตร์ (Bangkhen campus). */
-const CAMPUS_WAY_ID = 38001215
+/**
+ * Ways whose union forms the interactive campus area:
+ * - 38001215: main campus, amenity=university, name=มหาวิทยาลัยเกษตรศาสตร์
+ * - 589752219: Faculty of Veterinary Medicine parcel (across Phahonyothin Rd)
+ * - 589752221: Faculty of Veterinary Technology parcel (adjacent to the above)
+ * The first id is the main campus; the scene origin is its centroid.
+ */
+const CAMPUS_WAY_IDS = [38001215, 589752219, 589752221]
 /** Context ring around the campus that is rendered faded (meters). */
 const CONTEXT_MARGIN_M = 350
 /** ~11 cm precision is plenty for a campus map and keeps files small. */
@@ -82,14 +88,19 @@ function tagsOf(f: Feature): Tags {
 
 async function main() {
   console.log('Fetching campus boundary…')
-  const boundaryRaw = await overpass(`[out:json][timeout:60];way(${CAMPUS_WAY_ID});out geom;`)
-  const boundaryFc = osmtogeojson(boundaryRaw) as FeatureCollection
-  const boundary = boundaryFc.features.find((f) => f.geometry.type === 'Polygon') as
-    | Feature<Polygon>
-    | undefined
-  if (!boundary) throw new Error('Campus boundary polygon not found')
+  const boundaryRaw = await overpass(
+    `[out:json][timeout:60];way(id:${CAMPUS_WAY_IDS.join(',')});out geom;`,
+  )
+  const parts = (osmtogeojson(boundaryRaw) as FeatureCollection).features.filter(
+    (f): f is Feature<Polygon> => f.geometry.type === 'Polygon',
+  )
+  const main = parts.find((f) => osmId(f) === `way/${CAMPUS_WAY_IDS[0]}`)
+  if (!main || parts.length !== CAMPUS_WAY_IDS.length) {
+    throw new Error(`Expected ${CAMPUS_WAY_IDS.length} campus polygons, got ${parts.length}`)
+  }
+  const boundary = turf.union(turf.featureCollection(parts)) as Feature<Polygon | MultiPolygon>
 
-  const center = turf.centroid(boundary).geometry.coordinates
+  const center = turf.centroid(main).geometry.coordinates
   const contextPoly = turf.buffer(boundary, CONTEXT_MARGIN_M, { units: 'meters' })!
   const [w, s, e, n] = turf.bbox(contextPoly)
   const bboxStr = `${s},${w},${n},${e}`
@@ -107,6 +118,7 @@ async function main() {
   way["leisure"~"^(park|garden|pitch|stadium|track|swimming_pool|sports_centre)$"](${bboxStr});
   relation["leisure"~"^(park|garden|pitch|stadium|sports_centre)$"](${bboxStr});
   way["natural"~"^(wood|scrub|grassland)$"](${bboxStr});
+  node["natural"="tree"](${bboxStr});
 );
 out geom;`)
   const all = osmtogeojson(raw) as FeatureCollection
@@ -128,6 +140,7 @@ out geom;`)
   const water: Feature[] = []
   const green: Feature[] = []
   const sport: Feature[] = []
+  const trees: Feature[] = []
 
   for (const f of all.features) {
     const tags = tagsOf(f)
@@ -136,6 +149,16 @@ out geom;`)
     if (!g) continue
     const isArea = g.type === 'Polygon' || g.type === 'MultiPolygon'
     const isLine = g.type === 'LineString' || g.type === 'MultiLineString'
+    if (g.type === 'Point') {
+      if (tags.natural === 'tree') {
+        trees.push({
+          type: 'Feature',
+          geometry: roundCoords(g),
+          properties: { id, inside: turf.booleanPointInPolygon(g.coordinates, boundary), ...pick(tags, ['name', 'species', 'leaf_type']) },
+        })
+      }
+      continue
+    }
 
     // Clip context features to the buffered campus so the scene has a soft edge.
     let geom: Geometry | null = g
@@ -193,7 +216,7 @@ out geom;`)
     attribution: '© OpenStreetMap contributors',
     license: 'ODbL-1.0',
     fetchedAt: new Date().toISOString(),
-    campusWayId: CAMPUS_WAY_ID,
+    campusWayIds: CAMPUS_WAY_IDS,
     origin: { lng: round(center[0]), lat: round(center[1]) },
     bbox: [w, s, e, n].map(round),
     counts: {
@@ -202,6 +225,7 @@ out geom;`)
       water: water.length,
       green: green.length,
       sport: sport.length,
+      osmTrees: trees.length,
     },
   }
 
@@ -211,7 +235,11 @@ out geom;`)
   const boundaryClean: Feature<Polygon | MultiPolygon> = {
     type: 'Feature',
     geometry: roundCoords(boundary.geometry),
-    properties: { id: `way/${CAMPUS_WAY_ID}`, name: 'มหาวิทยาลัยเกษตรศาสตร์', 'name:en': 'Kasetsart University' },
+    properties: {
+      ids: CAMPUS_WAY_IDS.map((i) => `way/${i}`),
+      name: 'มหาวิทยาลัยเกษตรศาสตร์ วิทยาเขตบางเขน',
+      'name:en': 'Kasetsart University, Bangkhen Campus',
+    },
   }
   await Promise.all([
     write('boundary.json', boundaryClean),
@@ -220,9 +248,11 @@ out geom;`)
     write('water.json', fc(water)),
     write('green.json', fc(green)),
     write('sport.json', fc(sport)),
+    write('trees-osm.json', fc(trees)),
     writeFile(join(OUT_DIR, 'meta.json'), JSON.stringify(meta, null, 2) + '\n'),
   ])
   console.log('Wrote', OUT_DIR, meta.counts)
+  await derive()
 }
 
 function roadClass(highway: string): 'main' | 'minor' | 'path' | null {

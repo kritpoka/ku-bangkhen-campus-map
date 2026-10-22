@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { CampusMap } from './scene/CampusMap'
 import { Header } from './ui/Header'
 import { Attribution } from './ui/Attribution'
+import { PinLayer } from './ui/PinLayer'
+import { landmarks } from './data/landmarks'
 
 export default function App() {
   const { t } = useTranslation()
@@ -13,6 +15,7 @@ export default function App() {
           <CampusMap />
         </Suspense>
       </div>
+      <PinLayer landmarks={landmarks} />
       <Header />
       <Attribution />
     </div>

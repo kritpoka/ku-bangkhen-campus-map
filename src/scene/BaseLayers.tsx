@@ -1,80 +1,108 @@
 import { useMemo } from 'react'
-import { buildings, campusBoundary, green, roads, sport, water } from '../data/osm'
-import { extrudedPolygons, flatPolygons, linesOf, ribbons } from './geometry'
-import { buildingHeight } from './heights'
-import { palette } from './palette'
 import type { Feature } from 'geojson'
+import { buildings, campusBoundary, green, roads, sport, water } from '../data/osm'
+import { dashes, extrudedPolygons, flatPolygons, linesOf, mergeParts, offsetRing, openCCW, polygonsOf, prism, ribbons } from './geometry'
+import { buildingHeight } from './heights'
+import { modelledBuildingIds, modelledSportIds } from './modelSpecs'
+import { colorByFacing, materials } from './materials'
+import { palette } from './palette'
 
 const ROAD_WIDTH = { main: 9, minor: 5.5, path: 2.2 } as const
 
-/** The OSM-derived base map: ground, campus plate, green, water, roads, buildings. */
+/** The OSM-derived base map: ground, campus plate, green, water, roads, plain buildings. */
 export function BaseLayers() {
   const geo = useMemo(() => {
-    const byInside = <T extends Feature>(fs: T[], inside: boolean) =>
-      fs.filter((f) => (f.properties as { inside: boolean }).inside === inside)
+    const inside = <T extends Feature>(fs: T[], v: boolean) =>
+      fs.filter((f) => (f.properties as { inside: boolean }).inside === v)
 
-    const roadLines = (cls: 'main' | 'minor' | 'path', inside: boolean) =>
-      byInside(roads.features, inside)
+    const roadLines = (cls: 'main' | 'minor' | 'path', isIn: boolean) =>
+      inside(roads.features, isIn)
         .filter((f) => f.properties.class === cls && f.properties.service !== 'parking_aisle')
         .flatMap((f) => linesOf(f.geometry))
 
-    const waterAreas = water.features.filter((f) => f.geometry.type !== 'LineString')
-    const canals = water.features.filter((f) => f.geometry.type === 'LineString')
+    const parks = green.features.filter((f) => f.properties.leisure === 'park' || f.properties.natural === 'wood')
+    const lawns = green.features.filter((f) => !parks.includes(f))
+    const sportPlain = sport.features.filter((f) => !modelledSportIds.has(f.properties.id))
+    const pools = sportPlain.filter((f) => f.properties.leisure === 'swimming_pool')
+    const pitches = sportPlain.filter((f) => f.properties.leisure !== 'swimming_pool')
+    // Athletics pitches get a running track drawn around them.
+    const tracks = pitches
+      .filter((f) => /athletics/.test(f.properties.sport ?? ''))
+      .flatMap((f) =>
+        polygonsOf(f.geometry).map((rings) => {
+          const ring = openCCW(rings[0])
+          return prism(offsetRing(ring, 8), [ring], 0, 0.07)
+        }),
+      )
+
+    const plainBuildings = buildings.features.filter((f) => !modelledBuildingIds.has(f.properties.id))
+    const mainIn = roadLines('main', true)
+    const mainOut = roadLines('main', false)
 
     return {
       plate: flatPolygons([campusBoundary], 0.02),
-      green: flatPolygons(green.features, 0.05),
-      sport: flatPolygons(sport.features, 0.08),
-      water: flatPolygons(waterAreas, 0.1),
-      canals: ribbons(canals.flatMap((f) => linesOf(f.geometry)), 6, 0.1),
-      roadsIn: ribbons([...roadLines('main', true), ...roadLines('minor', true)], ROAD_WIDTH.minor, 0.15),
-      pathsIn: ribbons(roadLines('path', true), ROAD_WIDTH.path, 0.13),
-      roadsOut: ribbons(
-        [...roadLines('main', false), ...roadLines('minor', false)],
-        ROAD_WIDTH.minor,
-        0.15,
+      lawn: flatPolygons(lawns, 0.05),
+      park: flatPolygons(parks, 0.06),
+      pitch: flatPolygons(pitches, 0.09),
+      track: mergeParts(tracks),
+      pool: flatPolygons(pools, 0.1),
+      water: flatPolygons(water.features.filter((f) => f.geometry.type !== 'LineString'), 0.1),
+      canals: ribbons(
+        water.features.filter((f) => f.geometry.type === 'LineString').flatMap((f) => linesOf(f.geometry)),
+        6,
+        0.1,
       ),
-      buildingsIn: extrudedPolygons(byInside(buildings.features, true), buildingHeight),
-      buildingsOut: extrudedPolygons(byInside(buildings.features, false), buildingHeight),
+      roadsOut: ribbons([...mainOut, ...roadLines('minor', false)], ROAD_WIDTH.minor, 0.15),
+      mainOut: ribbons(mainOut, ROAD_WIDTH.main + 3, 0.14),
+      roadsIn: ribbons([...mainIn, ...roadLines('minor', true)], ROAD_WIDTH.minor, 0.16),
+      mainIn: ribbons(mainIn, ROAD_WIDTH.main, 0.15),
+      dashes: dashes([...mainIn, ...mainOut], 0.35, 3, 4, 0.2),
+      paths: ribbons(roadLines('path', true), ROAD_WIDTH.path, 0.13),
+      buildingsIn: colorByFacing(
+        extrudedPolygons(inside(plainBuildings, true), buildingHeight),
+        palette.building,
+        palette.buildingRoof,
+      ),
+      buildingsOut: colorByFacing(
+        extrudedPolygons(inside(plainBuildings, false), buildingHeight),
+        palette.buildingOutside,
+        palette.buildingRoof,
+      ),
     }
   }, [])
 
+  // Flat layers, bottom to top. They skip depth writes, so this order is what you see.
+  const flatLayers = [
+    ['ground', null, materials.groundOutside],
+    ['plate', geo.plate, materials.campusPlate],
+    ['lawn', geo.lawn, materials.lawn],
+    ['park', geo.park, materials.park],
+    ['track', geo.track, materials.track],
+    ['pitch', geo.pitch, materials.pitch],
+    ['water', geo.water, materials.water],
+    ['canals', geo.canals, materials.water],
+    ['pool', geo.pool, materials.pool],
+    ['mainOut', geo.mainOut, materials.roadOutside],
+    ['roadsOut', geo.roadsOut, materials.roadOutside],
+    ['paths', geo.paths, materials.path],
+    ['mainIn', geo.mainIn, materials.road],
+    ['roadsIn', geo.roadsIn, materials.road],
+    ['dashes', geo.dashes, materials.dash],
+  ] as const
+
   return (
     <group>
-      <mesh rotation-x={-Math.PI / 2} receiveShadow>
-        <planeGeometry args={[6000, 6000]} />
-        <meshLambertMaterial color={palette.groundOutside} />
-      </mesh>
-      <mesh geometry={geo.plate} receiveShadow>
-        <meshLambertMaterial color={palette.campusPlate} />
-      </mesh>
-      <mesh geometry={geo.green} receiveShadow>
-        <meshLambertMaterial color={palette.lawn} />
-      </mesh>
-      <mesh geometry={geo.sport} receiveShadow>
-        <meshLambertMaterial color={palette.pitch} />
-      </mesh>
-      <mesh geometry={geo.water}>
-        <meshLambertMaterial color={palette.water} />
-      </mesh>
-      <mesh geometry={geo.canals}>
-        <meshLambertMaterial color={palette.water} />
-      </mesh>
-      <mesh geometry={geo.roadsOut} receiveShadow>
-        <meshLambertMaterial color={palette.roadOutside} />
-      </mesh>
-      <mesh geometry={geo.roadsIn} receiveShadow>
-        <meshLambertMaterial color={palette.road} />
-      </mesh>
-      <mesh geometry={geo.pathsIn} receiveShadow>
-        <meshLambertMaterial color={palette.path} />
-      </mesh>
-      <mesh geometry={geo.buildingsOut} castShadow receiveShadow>
-        <meshLambertMaterial color={palette.buildingOutside} />
-      </mesh>
-      <mesh geometry={geo.buildingsIn} castShadow receiveShadow>
-        <meshLambertMaterial color={palette.building} />
-      </mesh>
+      {flatLayers.map(([key, geometry, material], i) =>
+        geometry ? (
+          <mesh key={key} geometry={geometry} material={material} renderOrder={i - 100} receiveShadow />
+        ) : (
+          <mesh key={key} rotation-x={-Math.PI / 2} material={material} renderOrder={i - 100} receiveShadow>
+            <planeGeometry args={[9000, 9000]} />
+          </mesh>
+        ),
+      )}
+      <mesh geometry={geo.buildingsOut} castShadow receiveShadow material={materials.building} />
+      <mesh geometry={geo.buildingsIn} castShadow receiveShadow material={materials.building} />
     </group>
   )
 }

@@ -2,6 +2,7 @@
   "app": {
     "documentTitle": "Kasetsart University Bangkhen Campus Map",
     "title": "KU Campus Map",
+    "shortTitle": "KU Map",
     "subtitle": "Bangkhen Campus",
     "loading": "Loading map…"
   },
