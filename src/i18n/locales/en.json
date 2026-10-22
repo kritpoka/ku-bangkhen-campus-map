@@ -49,5 +49,29 @@
     "zoomOut": "Zoom out",
     "home": "Show the whole campus",
     "compass": "Face north and reset tilt"
+  },
+  "filters": {
+    "label": "Filter by category",
+    "all": "All",
+    "faculty": "Faculties",
+    "food": "Food",
+    "sport": "Sport",
+    "library": "Library & study",
+    "admin": "Offices & services",
+    "transport": "Transport",
+    "landmark": "Landmarks & gates"
+  },
+  "search": {
+    "placeholder": "Search KU Bangkhen",
+    "label": "Search places",
+    "results": "Search results",
+    "suggested": "Suggested places",
+    "empty": "No places match “{{query}}”",
+    "emptyHint": "Try a shorter name, the Thai name, or the “All” filter.",
+    "clear": "Clear search",
+    "close": "Close search",
+    "count": "{{count}} results",
+    "filtered": "Filtered: {{list}}",
+    "stop": "Shuttle stop"
   }
 }

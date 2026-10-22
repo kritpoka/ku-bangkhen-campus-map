@@ -124,7 +124,7 @@ export function PinProjector({ landmarks, heights }: { landmarks: Landmark[]; he
     s.lastSize = sizeKey
     s.lastMatrix.copy(camera.matrixWorld)
 
-    const { lang, selectedId, insets } = pinBridge
+    const { lang, selectedId, insets, visible } = pinBridge
     const widthsKey = `${lang}|${document.fonts?.status}`
     if (s.widthsKey !== widthsKey) {
       s.widthsKey = widthsKey
@@ -153,7 +153,9 @@ export function PinProjector({ landmarks, heights }: { landmarks: Landmark[]; he
       const sy = (-v.y * 0.5 + 0.5) * size.height
       screen[i * 2] = sx
       screen[i * 2 + 1] = sy
+      const filteredOut = visible !== null && !visible.has(landmarks[i].id) && landmarks[i].id !== selectedId
       const off =
+        filteredOut ||
         v.z > 1 || sx < insets.left || sx > size.width - insets.right || sy < insets.top || sy > size.height - insets.bottom
       modes[i] = off ? 'hidden' : 'dot'
       if (off) continue

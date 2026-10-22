@@ -232,7 +232,7 @@ const raw: Landmark[] = [
     coordSource: 'osm',
     osmId: 'way/403121488',
     name: { th: 'อาคารสารนิเทศ 50 ปี', en: 'KU Golden Jubilee Administration and Information Center' },
-    shortName: { th: 'อาคารสารนิเทศ 50 ปี', en: 'Golden Jubilee Bldg' },
+    shortName: { th: 'อาคารสารนิเทศ 50 ปี', en: 'KU 50th Anniv. Bldg' },
     description: {
       th: 'อาคารสูง 10 ชั้น สร้างเนื่องในโอกาสครบรอบ 50 ปีของมหาวิทยาลัย เริ่มใช้งานในปี 2540 เป็นที่ตั้งของหน่วยงานบริหารส่วนกลางและสำนักงานอธิการบดี',
       en: "A 10-storey building marking the university's 50th anniversary, in use since 1997. It houses the central administration and the Office of the President.",

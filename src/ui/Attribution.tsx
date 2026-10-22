@@ -1,9 +1,9 @@
 import { useTranslation } from 'react-i18next'
 
-export function Attribution() {
+export function Attribution({ className = 'pointer-events-auto absolute bottom-1 left-1 z-10' }: { className?: string }) {
   const { t } = useTranslation()
   return (
-    <div className="pointer-events-auto absolute bottom-1 left-1 z-10 rounded-md bg-white/75 px-1.5 py-0.5 text-[10px] text-slate-600 backdrop-blur">
+    <div className={`rounded-md bg-white/75 px-1.5 py-0.5 text-[10px] text-slate-600 backdrop-blur ${className}`}>
       <a
         href="https://www.openstreetmap.org/copyright"
         target="_blank"

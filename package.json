@@ -12,7 +12,8 @@
     "derive-osm": "tsx scripts/derive-osm.ts",
     "test:touch": "node tests/e2e/gestures.mjs",
     "test:desktop": "node tests/e2e/desktop.mjs",
-    "test:webkit": "node tests/e2e/webkit.mjs"
+    "test:webkit": "node tests/e2e/webkit.mjs",
+    "test:search": "node tests/e2e/search.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

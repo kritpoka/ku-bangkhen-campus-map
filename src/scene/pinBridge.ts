@@ -9,6 +9,8 @@ export const pinBridge = {
   elements: new Map<string, HTMLElement>(),
   lang: 'th' as Lang,
   selectedId: null as string | null,
+  /** Landmark ids allowed by the category filters; null = all. */
+  visible: null as Set<string> | null,
   /** Screen areas covered by floating UI (CSS px); pins there are hidden. */
   insets: { top: 0, right: 0, bottom: 0, left: 0 },
   /** Camera distance that frames the whole campus; label budgets scale from it. */

@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useRef } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as THREE from 'three'
 import { landmarkById, landmarks } from './data/landmarks'
@@ -9,10 +9,14 @@ import { attachTouchGestures } from './scene/camera/touchGestures'
 import { CampusMap } from './scene/CampusMap'
 import { pinBridge } from './scene/pinBridge'
 import { Attribution } from './ui/Attribution'
-import { BottomSheet } from './ui/BottomSheet'
+import { BottomSheet, placeSnaps } from './ui/BottomSheet'
 import { CARD_MARGIN, CARD_WIDTH, DetailCard } from './ui/DetailCard'
 import { Header } from './ui/Header'
 import { MapControls } from './ui/MapControls'
+import { MobileSearch } from './ui/MobileSearch'
+import { visibleCategories, type ChipId } from './ui/filters'
+import { useHistoryFlag } from './ui/useHistoryFlag'
+import type { SearchResult } from './lib/search'
 import { PinLayer } from './ui/PinLayer'
 import { DESKTOP_QUERY, useMediaQuery } from './ui/useMediaQuery'
 import { useSelection } from './ui/useSelection'
@@ -27,6 +31,20 @@ export default function App() {
   const selected = selectedId ? landmarkById.get(selectedId) ?? null : null
   const mapRef = useRef<HTMLDivElement>(null)
   const sheetHeight = useRef(0)
+  const searchBarHeight = useRef(0)
+  const [chips, setChips] = useState<Set<ChipId>>(() => new Set())
+  const categories = useMemo(() => visibleCategories(chips), [chips])
+  const [searchOpen, openSearch, closeSearch] = useHistoryFlag('ku-map:search')
+
+  // Category filters hide non-matching pins (the selected place always stays).
+  useEffect(() => {
+    pinBridge.visible = categories ? new Set(landmarks.filter((l) => categories.has(l.category)).map((l) => l.id)) : null
+    pinBridge.touch()
+  }, [categories])
+
+  const pick = useCallback((r: SearchResult) => {
+    if (r.item.kind === 'landmark') select(r.item.id)
+  }, [select])
 
   // Fly so the place sits in the middle of the map area left uncovered by the card / sheet.
   const focus = useCallback(
@@ -42,7 +60,7 @@ export default function App() {
         })
       } else {
         const top = pinBridge.insets.top
-        const bottom = h - (sheetHeight.current || Math.min(h * 0.44, 380))
+        const bottom = h - (sheetHeight.current || placeSnaps(h)[1])
         mapCamera.flyTo(new THREE.Vector3(x, 0, z), {
           distance: Math.min(current, FOCUS_DISTANCE.mobile),
           sx: w / 2,
@@ -62,12 +80,24 @@ export default function App() {
     return () => cancelAnimationFrame(raf)
   }, [selected, focus])
 
-  // Keep pins out from under the card (desktop) or sheet (mobile).
+  // Keep pins out from under the card (desktop), place sheet or search bar (mobile).
   useEffect(() => {
     pinBridge.insets.right = isDesktop && selected ? CARD_WIDTH + CARD_MARGIN * 2 : 0
-    if (!selected || isDesktop) pinBridge.insets.bottom = 0
+    if (isDesktop) pinBridge.insets.bottom = 0
+    else if (!selected) pinBridge.insets.bottom = searchBarHeight.current
     pinBridge.touch()
   }, [isDesktop, selected])
+
+  const onSearchBarHeight = useCallback(
+    (px: number) => {
+      searchBarHeight.current = px
+      if (!selected) {
+        pinBridge.insets.bottom = px
+        pinBridge.touch()
+      }
+    },
+    [selected],
+  )
 
   const onSheetHeight = useCallback((px: number) => {
     sheetHeight.current = px
@@ -138,7 +168,7 @@ export default function App() {
         </Suspense>
         <PinLayer landmarks={landmarks} selectedId={selectedId} onSelect={select} />
       </div>
-      <Header />
+      <Header isDesktop={isDesktop} chips={chips} onChips={setChips} categories={categories} onPick={pick} />
       <MapControls
         className={`absolute z-20 transition-[right] duration-200 motion-reduce:transition-none ${
           isDesktop ? 'top-1/2 -translate-y-1/2' : 'top-[84px]'
@@ -151,7 +181,19 @@ export default function App() {
         ) : (
           <BottomSheet landmark={selected} onClose={close} onFocus={refocus} onHeight={onSheetHeight} />
         ))}
-      <Attribution />
+      {!isDesktop && !selected && (
+        <MobileSearch
+          expanded={searchOpen}
+          onExpand={openSearch}
+          onCollapse={closeSearch}
+          chips={chips}
+          onChips={setChips}
+          categories={categories}
+          onPick={pick}
+          onHeight={onSearchBarHeight}
+        />
+      )}
+      {isDesktop && <Attribution />}
     </div>
   )
 }
