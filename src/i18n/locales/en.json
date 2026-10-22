@@ -1,0 +1,16 @@
+{
+  "app": {
+    "documentTitle": "Kasetsart University Bangkhen Campus Map",
+    "title": "KU Campus Map",
+    "subtitle": "Bangkhen Campus",
+    "loading": "Loading map…"
+  },
+  "lang": {
+    "toggle": "Change language",
+    "th": "ไทย",
+    "en": "EN"
+  },
+  "attribution": {
+    "osm": "© OpenStreetMap contributors"
+  }
+}
