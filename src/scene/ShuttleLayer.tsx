@@ -108,11 +108,12 @@ export function ShuttleLayer({ activeLine }: { activeLine: string | null }) {
         const dim = activeLine !== null && !active
         d.casingMat.opacity = dim ? 0.3 : 0.95
         d.lineMat.opacity = dim ? 0.2 : 1
-        const order = active ? -40 : -60 + i * 2
+        // All casings first (beneath every line), then lines widest → narrowest so
+        // shared roads show concentric stripes. The active line goes on top.
         return (
           <group key={d.id}>
-            <mesh geometry={d.casing} material={d.casingMat} renderOrder={order} frustumCulled={false} />
-            <mesh geometry={d.line} material={d.lineMat} renderOrder={order + 1} frustumCulled={false} />
+            <mesh geometry={d.casing} material={d.casingMat} renderOrder={active ? -42 : -70 + i} frustumCulled={false} />
+            <mesh geometry={d.line} material={d.lineMat} renderOrder={active ? -41 : -60 + i} frustumCulled={false} />
           </group>
         )
       })}

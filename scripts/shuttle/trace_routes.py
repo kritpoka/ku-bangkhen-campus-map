@@ -204,6 +204,42 @@ EXCLUDE = {
     },
 }
 
+# Reviewed additions: force the shortest road path between two points into a
+# line, where the official map clearly shows the line but tracing missed it
+# (usually because another line is drawn on top of it on the map).
+FORCE_LINKS = {
+    'bus1': [
+        # East trunk from Agriculture (E14) south past the Library (E12) to E10.
+        ((100.572477, 13.850117), (100.572502, 13.846540)),
+    ],
+}
+
+def force_link(segs, graph, idx, a_lnglat, b_lnglat):
+    import heapq
+    nodes = list(graph)
+    arr = np.array(nodes)
+    def nearest(lnglat):
+        p = np.array(proj(*lnglat))
+        return nodes[int(np.argmin(((arr - p) ** 2).sum(1)))]
+    start, goal = nearest(a_lnglat), nearest(b_lnglat)
+    dist, prev, pq = {start: 0.0}, {}, [(0.0, start)]
+    while pq:
+        d, u = heapq.heappop(pq)
+        if u == goal:
+            break
+        if d > dist.get(u, 1e18):
+            continue
+        for v, si, L in graph.get(u, []):
+            if d + L < dist.get(v, 1e18):
+                dist[v], prev[v] = d + L, (u, si)
+                heapq.heappush(pq, (d + L, v))
+    out = set(idx)
+    u = goal
+    while u != start and u in prev:
+        u, si = prev[u]
+        out.add(si)
+    return sorted(out)
+
 COVER_TOL = 14.0  # m: route ink this close counts as covering the road (parallel lines are drawn ~9 m apart)
 COVER_MIN = 0.6  # fraction of a segment that must be covered
 
@@ -533,6 +569,8 @@ if __name__ == '__main__':
         idx = [i for i in idx if segs[i]['way'] not in excluded]
         graph_ok = {k: [e for e in v if segs[e[1]]['way'] not in excluded] for k, v in graph.items()}
         idx = prune_spurs(segs, fill_gaps(segs, idx, graph_ok))
+        for a_ll, b_ll in FORCE_LINKS.get(name, []):
+            idx = force_link(segs, graph_ok, idx, a_ll, b_ll)
         if '--chains' in sys.argv:
             tp = lambda q: (700 + (q[0] - 50) * 0.62, 700 - (q[1] - 100) * 0.62)
             for chain, u, v in junction_chains(segs, set(idx)):
