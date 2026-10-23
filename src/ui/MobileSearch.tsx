@@ -1,4 +1,5 @@
 import { ArrowLeft, Search, X } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Category } from '../data/types'
@@ -20,6 +21,8 @@ interface Props {
   onPick: (r: SearchResult) => void
   /** Height of the collapsed bar (px), so pins stay clear of it. */
   onHeight: (px: number) => void
+  /** Extra row above the filter chips in the collapsed bar (e.g. shuttle lines). */
+  aboveChips?: ReactNode
 }
 
 /**
@@ -27,7 +30,7 @@ interface Props {
  * it) at the bottom of the screen; tapping it expands a full-height sheet with
  * the input, chips and results.
  */
-export function MobileSearch({ expanded, onExpand, onCollapse, chips, onChips, categories, onPick, onHeight }: Props) {
+export function MobileSearch({ expanded, onExpand, onCollapse, chips, onChips, categories, onPick, onHeight, aboveChips }: Props) {
   const { t } = useTranslation()
   const listId = useId()
   const vh = useViewportHeight()
@@ -57,6 +60,7 @@ export function MobileSearch({ expanded, onExpand, onCollapse, chips, onChips, c
   if (!expanded) {
     return (
       <div ref={bar} className="pointer-events-none fixed inset-x-0 bottom-0 z-20 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        {aboveChips}
         <FilterChips active={chips} onChange={onChips} className="pointer-events-auto px-3 pb-2" />
         <div className="px-3">
           <button

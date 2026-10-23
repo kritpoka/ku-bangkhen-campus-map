@@ -1,4 +1,4 @@
-import { House, Minus, Plus } from 'lucide-react'
+import { Bus, House, Minus, Plus } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { mapCamera } from '../scene/camera/mapCamera'
@@ -13,7 +13,17 @@ const buttonClass =
  * Floating map controls: zoom, compass (only when rotated away from north)
  * and home. Positioned by the parent.
  */
-export function MapControls({ className = '', style }: { className?: string; style?: React.CSSProperties }) {
+export function MapControls({
+  className = '',
+  style,
+  shuttleOn,
+  onToggleShuttle,
+}: {
+  className?: string
+  style?: React.CSSProperties
+  shuttleOn: boolean
+  onToggleShuttle: () => void
+}) {
   const { t } = useTranslation()
   return (
     <nav aria-label={t('controls.label')} className={`flex flex-col items-end gap-2 ${className}`} style={style}>
@@ -29,6 +39,18 @@ export function MapControls({ className = '', style }: { className?: string; sty
           <House className="size-5" aria-hidden />
         </button>
       </div>
+      <button
+        type="button"
+        aria-pressed={shuttleOn}
+        aria-label={t('shuttle.toggle')}
+        title={t('shuttle.toggle')}
+        onClick={onToggleShuttle}
+        className={`flex size-11 items-center justify-center rounded-2xl shadow-lg shadow-ku-900/10 ring-1 ring-black/5 backdrop-blur transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ku-600 ${
+          shuttleOn ? 'bg-slate-800 text-white' : 'bg-white/95 text-slate-700 hover:bg-ku-50'
+        }`}
+      >
+        <Bus className="size-5" aria-hidden />
+      </button>
     </nav>
   )
 }

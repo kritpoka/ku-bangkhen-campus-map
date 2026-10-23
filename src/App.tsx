@@ -20,6 +20,11 @@ import type { SearchResult } from './lib/search'
 import { PinLayer } from './ui/PinLayer'
 import { DESKTOP_QUERY, useMediaQuery } from './ui/useMediaQuery'
 import { useSelection } from './ui/useSelection'
+import { shuttleLines, shuttleStopById, shuttleStops } from './data/shuttle'
+import { stopBridge } from './scene/stopBridge'
+import { StopLayer } from './ui/StopLayer'
+import { LEGEND_WIDTH, LineChips, LineSheet, ShuttleLegendCard, StopCard, StopSheet } from './ui/ShuttlePanels'
+import './ui/shuttleSearch'
 
 /** Camera distance (m) when focusing a place; closer views are kept. */
 const FOCUS_DISTANCE = { desktop: 460, mobile: 560 }
@@ -42,9 +47,82 @@ export default function App() {
     pinBridge.touch()
   }, [categories])
 
-  const pick = useCallback((r: SearchResult) => {
-    if (r.item.kind === 'landmark') select(r.item.id)
-  }, [select])
+  // ─── Shuttle overlay ───────────────────────────────────────────────────
+  const [shuttleOn, setShuttleOn] = useState(false)
+  const [activeLine, setActiveLine] = useState<string | null>(null)
+  const [stopId, setStopId] = useState<string | null>(null)
+  const stop = stopId ? shuttleStopById.get(stopId) ?? null : null
+
+  useEffect(() => {
+    const line = shuttleLines.find((l) => l.id === activeLine)
+    stopBridge.visible = !shuttleOn
+      ? new Set()
+      : new Set(shuttleStops.filter((s) => !s.offMap && (!line || line.stops.includes(s.id))).map((s) => s.id))
+    stopBridge.touch()
+  }, [shuttleOn, activeLine])
+
+  const toggleShuttle = useCallback(() => {
+    if (shuttleOn) {
+      setActiveLine(null)
+      setStopId(null)
+    }
+    setShuttleOn(!shuttleOn)
+  }, [shuttleOn])
+
+  const flyToPoint = useCallback((lng: number, lat: number, distance: number) => {
+    const [x, z] = toScene(lng, lat)
+    const current = mapCamera.ready ? mapCamera.read().distance : Infinity
+    mapCamera.flyTo(new THREE.Vector3(x, 0, z), { distance: Math.min(current, distance) })
+  }, [])
+
+  // A stop and a place are never both open.
+  const selectStop = useCallback(
+    (id: string | null, fly = false) => {
+      if (id) {
+        select(null)
+        setShuttleOn(true)
+        const s = shuttleStopById.get(id)
+        if (fly && s) flyToPoint(s.coordinates.lng, s.coordinates.lat, 520)
+      }
+      setStopId(id)
+    },
+    [select, flyToPoint],
+  )
+  const selectPlace = useCallback(
+    (id: string | null) => {
+      if (id) setStopId(null)
+      select(id)
+    },
+    [select],
+  )
+
+  const pick = useCallback(
+    (r: SearchResult) => {
+      if (r.item.kind === 'landmark') selectPlace(r.item.id)
+      else selectStop(r.item.id, true)
+    },
+    [selectPlace, selectStop],
+  )
+
+  // Picking the Transport chip turns the shuttle overlay on.
+  const onChips = useCallback(
+    (next: Set<ChipId>) => {
+      if (next.has('transport') && !chips.has('transport')) setShuttleOn(true)
+      setChips(next)
+    },
+    [chips],
+  )
+
+  /** What a tap/click at a map point selects: a shuttle stop (overlay on), else a pin, else nothing. */
+  const tapAt = useCallback(
+    (x: number, y: number) => {
+      const s = shuttleOn ? stopBridge.hitTest(x, y) : null
+      if (s) return selectStop(s)
+      setStopId(null)
+      selectPlace(pinBridge.hitTest(x, y))
+    },
+    [shuttleOn, selectStop, selectPlace],
+  )
 
   // Fly so the place sits in the middle of the map area left uncovered by the card / sheet.
   const focus = useCallback(
@@ -80,37 +158,46 @@ export default function App() {
     return () => cancelAnimationFrame(raf)
   }, [selected, focus])
 
-  // Keep pins out from under the card (desktop), place sheet or search bar (mobile).
+  // Which mobile bottom surface is showing: a place, a stop, a line, or the search bar.
+  const mobileLine = !isDesktop && !selected && !stop && activeLine ? activeLine : null
+  const sheetOpen = !isDesktop && (!!selected || !!stop || !!mobileLine)
+  const rightCard = isDesktop && (!!selected || !!stop)
+
+  // Keep pins and stops out from under the card (desktop), sheets or search bar (mobile).
   useEffect(() => {
-    pinBridge.insets.right = isDesktop && selected ? CARD_WIDTH + CARD_MARGIN * 2 : 0
+    pinBridge.insets.right = rightCard ? CARD_WIDTH + CARD_MARGIN * 2 : 0
+    pinBridge.insets.left = isDesktop && shuttleOn ? LEGEND_WIDTH + 16 : 0
     if (isDesktop) pinBridge.insets.bottom = 0
-    else if (!selected) pinBridge.insets.bottom = searchBarHeight.current
+    else if (!sheetOpen) pinBridge.insets.bottom = searchBarHeight.current
     pinBridge.touch()
-  }, [isDesktop, selected])
+    stopBridge.touch()
+  }, [isDesktop, rightCard, sheetOpen, shuttleOn])
 
   const onSearchBarHeight = useCallback(
     (px: number) => {
       searchBarHeight.current = px
-      if (!selected) {
+      if (!sheetOpen) {
         pinBridge.insets.bottom = px
         pinBridge.touch()
+        stopBridge.touch()
       }
     },
-    [selected],
+    [sheetOpen],
   )
 
   const onSheetHeight = useCallback((px: number) => {
     sheetHeight.current = px
     pinBridge.insets.bottom = px
     pinBridge.touch()
+    stopBridge.touch()
   }, [])
 
   // Touch: Google Maps–style gestures. A tap selects the pin under it, or clears the selection.
   useEffect(() => {
     const el = mapRef.current
     if (!el) return
-    return attachTouchGestures(el, { onTap: (x, y) => select(pinBridge.hitTest(x, y)) })
-  }, [select])
+    return attachTouchGestures(el, { onTap: tapAt })
+  }, [tapAt])
 
   // Mouse: a click (not a drag) selects the pin under the cursor, or clears the
   // selection on empty map. Hovering a pin shows a pointer cursor.
@@ -129,11 +216,12 @@ export default function App() {
       if (!down || e.pointerType !== 'mouse') return
       const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y)
       down = null
-      if (moved < 5) select(pinBridge.hitTest(...local(e)))
+      if (moved < 5) tapAt(...local(e))
     }
     const onHover = (e: PointerEvent) => {
       if (e.pointerType !== 'mouse' || e.buttons) return
-      el.style.cursor = pinBridge.hitTest(...local(e)) ? 'pointer' : ''
+      const [x, y] = local(e)
+      el.style.cursor = (shuttleOn && stopBridge.hitTest(x, y)) || pinBridge.hitTest(x, y) ? 'pointer' : ''
     }
     el.addEventListener('pointerdown', onDown)
     el.addEventListener('pointerup', onUp)
@@ -143,15 +231,19 @@ export default function App() {
       el.removeEventListener('pointerup', onUp)
       el.removeEventListener('pointermove', onHover)
     }
-  }, [select])
+  }, [tapAt, shuttleOn])
 
   // Escape closes the desktop card (the sheet handles its own).
   useEffect(() => {
     if (!isDesktop) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && select(null)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (stopId) setStopId(null)
+      else select(null)
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isDesktop, select])
+  }, [isDesktop, select, stopId])
 
   const close = useCallback(() => select(null), [select])
   const refocus = useCallback(() => selected && focus(selected), [selected, focus])
@@ -164,30 +256,42 @@ export default function App() {
         className="absolute inset-0 touch-none select-none [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none]"
       >
         <Suspense fallback={<p className="p-6 text-sm text-ku-700">{t('app.loading')}</p>}>
-          <CampusMap />
+          <CampusMap shuttleOn={shuttleOn} activeLine={activeLine} />
         </Suspense>
-        <PinLayer landmarks={landmarks} selectedId={selectedId} onSelect={select} />
+        <PinLayer landmarks={landmarks} selectedId={selectedId} onSelect={selectPlace} />
+        {shuttleOn && <StopLayer selectedId={stopId} onSelect={(id) => selectStop(id)} />}
       </div>
-      <Header isDesktop={isDesktop} chips={chips} onChips={setChips} categories={categories} onPick={pick} />
+      <Header isDesktop={isDesktop} chips={chips} onChips={onChips} categories={categories} onPick={pick} />
       <MapControls
         className={`absolute z-20 transition-[right] duration-200 motion-reduce:transition-none ${
           isDesktop ? 'top-1/2 -translate-y-1/2' : 'top-[84px]'
         }`}
-        style={{ right: isDesktop && selected ? CARD_WIDTH + CARD_MARGIN * 2 : isDesktop ? 16 : 12 }}
+        style={{ right: rightCard ? CARD_WIDTH + CARD_MARGIN * 2 : isDesktop ? 16 : 12 }}
+        shuttleOn={shuttleOn}
+        onToggleShuttle={toggleShuttle}
       />
+      {isDesktop && shuttleOn && (
+        <ShuttleLegendCard activeLine={activeLine} onLine={setActiveLine} onStop={(id) => selectStop(id, true)} onClose={toggleShuttle} />
+      )}
+      {isDesktop && stop && !selected && <StopCard stopId={stop.id} activeLine={activeLine} onLine={setActiveLine} onClose={() => setStopId(null)} />}
+      {!isDesktop && stop && !selected && (
+        <StopSheet stopId={stop.id} activeLine={activeLine} onLine={setActiveLine} onClose={() => setStopId(null)} onHeight={onSheetHeight} />
+      )}
+      {mobileLine && <LineSheet lineId={mobileLine} onClose={() => setActiveLine(null)} onStop={(id) => selectStop(id, true)} onHeight={onSheetHeight} />}
       {selected &&
         (isDesktop ? (
           <DetailCard landmark={selected} onClose={close} onFocus={refocus} />
         ) : (
           <BottomSheet landmark={selected} onClose={close} onFocus={refocus} onHeight={onSheetHeight} />
         ))}
-      {!isDesktop && !selected && (
+      {!isDesktop && !sheetOpen && (
         <MobileSearch
+          aboveChips={shuttleOn ? <LineChips activeLine={activeLine} onLine={setActiveLine} /> : undefined}
           expanded={searchOpen}
           onExpand={openSearch}
           onCollapse={closeSearch}
           chips={chips}
-          onChips={setChips}
+          onChips={onChips}
           categories={categories}
           onPick={pick}
           onHeight={onSearchBarHeight}

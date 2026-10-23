@@ -73,5 +73,29 @@
     "count": "{{count}} results",
     "filtered": "Filtered: {{list}}",
     "stop": "Shuttle stop"
+  },
+  "shuttle": {
+    "title": "KU Shuttle",
+    "toggle": "Show shuttle routes",
+    "hide": "Hide shuttle routes",
+    "stop": "Shuttle stop",
+    "servedBy": "Lines serving this stop",
+    "noLines": "This stop isn’t on KU’s official route map",
+    "buses": "{{count}} buses",
+    "noService": "No service",
+    "days": {
+      "weekdays": "Mon–Fri",
+      "saturday": "Saturday",
+      "sunday": "Sunday"
+    },
+    "stopsInOrder": "Stops in order",
+    "offMap": "outside this map",
+    "disclaimer": "Routes traced from KU’s official route map (Mar 2022) onto OpenStreetMap roads; they may be slightly off. Hours from the 2026 schedule.",
+    "sources": "Sources:",
+    "routeMap": "route map",
+    "schedule": "schedule",
+    "app": "Live bus positions: the KU Talai app (Google Play / App Store).",
+    "approxPosition": "Stop position read from the official map, so it’s approximate.",
+    "notOfficial": "This stop is in OpenStreetMap but not on KU’s official route map."
   }
 }

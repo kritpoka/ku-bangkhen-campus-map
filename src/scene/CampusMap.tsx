@@ -8,6 +8,8 @@ import { landmarks } from '../data/landmarks'
 import { BaseLayers } from './BaseLayers'
 import { LandmarkModels, buildLandmarkModels } from './LandmarkModels'
 import { PinProjector } from './Pins'
+import { ShuttleLayer } from './ShuttleLayer'
+import { StopProjector } from './StopProjector'
 import { pinBridge } from './pinBridge'
 import { mapCamera } from './camera/mapCamera'
 import { Trees } from './Trees'
@@ -185,7 +187,7 @@ function Sun({ controls }: { controls: React.RefObject<OrbitControlsImpl | null>
   )
 }
 
-function Scene() {
+function Scene({ shuttleOn, activeLine }: CampusMapProps) {
   const controls = useRef<OrbitControlsImpl>(null)
   const models = useMemo(() => buildLandmarkModels(), [])
   const heights = useMemo(() => pinHeights(landmarks, models.tops), [models])
@@ -199,6 +201,8 @@ function Scene() {
       <Trees shadows />
       <LandmarkModels models={models} />
       <PinProjector landmarks={landmarks} heights={heights} />
+      {shuttleOn && <ShuttleLayer activeLine={activeLine} />}
+      {shuttleOn && <StopProjector />}
       <OrbitControls
         ref={controls}
         makeDefault
@@ -216,7 +220,12 @@ function Scene() {
   )
 }
 
-export function CampusMap() {
+interface CampusMapProps {
+  shuttleOn: boolean
+  activeLine: string | null
+}
+
+export function CampusMap(props: CampusMapProps) {
   return (
     <Canvas
       shadows={{ type: THREE.PCFShadowMap }}
@@ -225,7 +234,7 @@ export function CampusMap() {
       camera={{ fov: VFOV, near: 4, far: 20000, position: [0, 2000, 2000] }}
       gl={{ antialias: true, powerPreference: 'high-performance', toneMapping: THREE.NoToneMapping }}
     >
-      <Scene />
+      <Scene {...props} />
     </Canvas>
   )
 }
