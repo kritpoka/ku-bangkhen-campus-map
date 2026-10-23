@@ -8,6 +8,8 @@ npm run dev -- --port 5179        # in another terminal
 npm run test:touch                # multi-touch gestures, Chrome mobile emulation (26 checks)
 npm run test:desktop              # mouse + keyboard on desktop Chrome (9 checks)
 npm run test:webkit               # Safari engine: native taps + synthetic multi-touch (9 checks)
+npm run test:search               # search, filters, back-gesture history, sheet snaps (20 checks)
+npm run test:shuttle              # shuttle overlay: toggle, lines, stop tap, stop search (12 checks)
 ```
 
 Requirements: Google Chrome installed (tests use `channel: 'chrome'`), and for

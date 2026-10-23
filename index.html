@@ -2,7 +2,10 @@
 <html lang="th">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="%BASE_URL%favicon-32.png" />
+    <link rel="apple-touch-icon" href="%BASE_URL%apple-touch-icon.png" />
+    <link rel="manifest" href="%BASE_URL%site.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#006664" />
     <meta name="description" content="แผนที่ 3 มิติ มหาวิทยาลัยเกษตรศาสตร์ บางเขน — 3D Kasetsart University Bangkhen campus map" />
@@ -19,6 +22,24 @@
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" />
     </noscript>
     <title>แผนที่มหาวิทยาลัยเกษตรศาสตร์ บางเขน</title>
+
+    <!-- Link previews (LINE, Facebook, X). Crawlers need absolute URLs: set
+         VITE_SITE_URL (e.g. https://ku-map.vercel.app) when building. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="KU Campus Map" />
+    <meta property="og:title" content="แผนที่มหาวิทยาลัยเกษตรศาสตร์ บางเขน · KU Bangkhen Campus Map" />
+    <meta property="og:description" content="แผนที่ 3 มิติ มก. บางเขน: ค้นหาคณะ อาคาร ร้านอาหาร และเส้นทางรถตะลัย — 3D map of Kasetsart University Bangkhen with search and shuttle routes." />
+    <meta property="og:url" content="%VITE_SITE_URL%/" />
+    <meta property="og:image" content="%VITE_SITE_URL%/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="3D map of Kasetsart University Bangkhen campus with labelled faculties and landmarks" />
+    <meta property="og:locale" content="th_TH" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="แผนที่มหาวิทยาลัยเกษตรศาสตร์ บางเขน · KU Bangkhen Campus Map" />
+    <meta name="twitter:description" content="3D campus map with bilingual search, landmarks and KU shuttle routes." />
+    <meta name="twitter:image" content="%VITE_SITE_URL%/og-image.jpg" />
   </head>
   <body>
     <div id="root"></div>
