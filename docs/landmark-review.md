@@ -16,6 +16,7 @@ Primary sources besides OSM:
 |---|---|---|---|---|---|
 | gate-phahonyothin-1 | ประตูพหลโยธิน 1 | Phahonyothin Gate 1 | n10275199705 | 13.841536, 100.576401 | Tagged `entrance=main`. OSM has the English name only; Thai follows the same numbering. |
 | gate-ngamwongwan-1 | ประตูงามวงศ์วาน 1 | Ngamwongwan Gate 1 | n10275257609 | 13.842212, 100.571391 | Thai name confirmed by KU shuttle stop and BMTA stop names in OSM. |
+| gate-ngamwongwan-2 | ประตูงามวงศ์วาน 2 | Ngamwongwan Gate 2 | n10275199708 | 13.844050, 100.568107 | Added after review. OSM `entrance=yes`, English name only; Thai name as printed on KU's shuttle route maps. Plain pin. |
 | gate-ngamwongwan-3 | ประตูงามวงศ์วาน 3 | Ngamwongwan Gate 3 | n10275199707 | 13.845228, 100.566001 | KU site places KU Avenue "at Ngamwongwan Road Gate 3". |
 | *(optional)* gate-vibhavadi | ประตูวิภาวดีรังสิต | Vibhavadi Rangsit Gate | n10275199706 | 13.852381, 100.564654 | English only in OSM; Thai name unverified. |
 

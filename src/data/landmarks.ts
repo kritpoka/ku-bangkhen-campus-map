@@ -81,6 +81,26 @@ const raw: Landmark[] = [
     sources: [OSM('node/10275257609'), OSM('node/891276461'), OSM('node/1374627083')],
   },
   {
+    id: 'gate-ngamwongwan-2',
+    category: 'gate',
+    coordinates: { lat: 13.8440502, lng: 100.5681072 },
+    coordSource: 'osm',
+    osmId: 'node/10275199708',
+    name: { th: 'ประตูงามวงศ์วาน 2', en: 'Ngamwongwan Gate 2' },
+    description: {
+      th: 'ประตูฝั่งถนนงามวงศ์วานทางด้านใต้ของวิทยาเขต อยู่ระหว่างประตูงามวงศ์วาน 1 และ 3 ใกล้คณะบริหารธุรกิจและอาคารจอดรถงามวงศ์วาน 2',
+      en: 'A gate on Ngamwongwan Road on the south side of campus, between Ngamwongwan Gates 1 and 3, near the Faculty of Business Administration and the Ngamwongwan 2 parking building.',
+    },
+    images: [],
+    searchAliases: ['ประตู 2', 'ประตูงามวงศ์วาน', 'Gate 2', 'Ngam Wong Wan Gate 2'],
+    sources: [
+      OSM('node/10275199708'),
+      OSM('way/94324290'),
+      'https://vehicle.ku.ac.th/index.html/wp-content/uploads/2022/06/bus1.jpeg',
+    ],
+    notes: 'OSM entrance node is tagged in English only ("Ngamwongwan Gate 2 - Kasetsart University"); the Thai name is printed on KU\'s shuttle route maps ("ประตูงามวงศ์วาน 2 / NGAMWONGWAN 2 GATE").',
+  },
+  {
     id: 'gate-ngamwongwan-3',
     category: 'gate',
     coordinates: { lat: 13.845228, lng: 100.566001 },

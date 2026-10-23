@@ -12,6 +12,7 @@ To add your own photo:
 |---|---|---|
 | `gate-phahonyothin-1` | ประตูพหลโยธิน 1 / Phahonyothin Gate 1 | gate |
 | `gate-ngamwongwan-1` | ประตูงามวงศ์วาน 1 / Ngamwongwan Gate 1 | gate |
+| `gate-ngamwongwan-2` | ประตูงามวงศ์วาน 2 / Ngamwongwan Gate 2 | gate |
 | `gate-ngamwongwan-3` | ประตูงามวงศ์วาน 3 / Ngamwongwan Gate 3 | gate |
 | `gate-vibhavadi` | ประตูวิภาวดีรังสิต / Vibhavadi Rangsit Gate | gate |
 | `hexagonal-pavilion` | ศาลาหกเหลี่ยม / Hexagonal Pavilion | landmark |
