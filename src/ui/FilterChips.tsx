@@ -47,7 +47,7 @@ export function FilterChips({ active, onChange, className = '' }: Props) {
     <div
       role="group"
       aria-label={t('filters.label')}
-      className={`flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${className}`}
+      className={`flex touch-pan-x gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${className}`}
     >
       {chip('all', active.size === 0, () => onChange(new Set()))}
       {CHIPS.map((c) => chip(c.id, active.has(c.id), () => toggle(c.id)))}

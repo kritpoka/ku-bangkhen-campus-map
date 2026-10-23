@@ -187,6 +187,7 @@ npm run test:touch             # Google Maps-style multi-touch gestures (CDP tou
 npm run test:desktop           # mouse, wheel, keyboard
 npm run test:webkit            # Safari engine (one-time: npx playwright-core install webkit)
 npm run test:search            # search, filters, back-gesture history, sheet snaps
+npm run test:sheets            # mobile bottom sheets: drag, inner scroll, dismiss
 npm run test:shuttle           # shuttle data validation + overlay, lines, stops
 npm run test:shuttle-data      # shuttle routes only (no browser needed)
 ```

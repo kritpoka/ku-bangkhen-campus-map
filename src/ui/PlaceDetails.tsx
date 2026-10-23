@@ -149,7 +149,7 @@ function Photos({ landmark }: { landmark: Landmark }) {
   return (
     <figure className="space-y-1.5">
       <div
-        className="flex snap-x snap-mandatory gap-2 overflow-x-auto rounded-2xl [scrollbar-width:none]"
+        className="flex touch-pan-x snap-x snap-mandatory gap-2 overflow-x-auto rounded-2xl [scrollbar-width:none]"
         aria-label={t('panel.photos')}
         onScroll={(e) => {
           const el = e.currentTarget

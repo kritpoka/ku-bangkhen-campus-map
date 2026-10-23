@@ -9,6 +9,7 @@ npm run test:touch                # multi-touch gestures, Chrome mobile emulatio
 npm run test:desktop              # mouse + keyboard, controls vs. cards at 768–1440 px (12 checks)
 npm run test:webkit               # Safari engine: native taps + synthetic multi-touch (9 checks)
 npm run test:search               # search, filters, back-gesture history, sheet snaps (20 checks)
+npm run test:sheets               # mobile bottom sheets at 375 px: drag anywhere, scroll hand-off, dismiss (15 checks)
 npm run test:shuttle              # shuttle data validation, then overlay: toggle, lines, stops, chips (19 checks)
 npm run test:shuttle-data         # route data only: on campus, continuous, stops near their line
 ```

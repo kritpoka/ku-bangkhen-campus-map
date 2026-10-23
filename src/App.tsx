@@ -118,15 +118,21 @@ export default function App() {
     [chips],
   )
 
-  /** What a tap/click at a map point selects: a shuttle stop (overlay on), else a pin, else nothing. */
+  /**
+   * What a clean tap/click at a map point selects: a shuttle stop (overlay on),
+   * else a pin, else nothing, which closes the open card / sheet (on mobile
+   * also the line sheet). Pans, pinches and rotations never get here.
+   */
   const tapAt = useCallback(
     (x: number, y: number) => {
       const s = shuttleOn ? stopBridge.hitTest(x, y) : null
       if (s) return selectStop(s)
       setStopId(null)
-      selectPlace(pinBridge.hitTest(x, y))
+      const pin = pinBridge.hitTest(x, y)
+      if (!pin && !isDesktop) setActiveLine(null)
+      selectPlace(pin)
     },
-    [shuttleOn, selectStop, selectPlace],
+    [shuttleOn, isDesktop, selectStop, selectPlace],
   )
 
   // Fly so the place sits in the middle of the map area left uncovered by the card / sheet.

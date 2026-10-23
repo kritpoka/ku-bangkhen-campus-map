@@ -1,6 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 
 const FLICK = 0.5 // px/ms
+/** Movement (px) before a touch is classed as a vertical drag or a horizontal swipe. */
+const LOCK = 8
+/** Rubber band past the top snap: the sheet moves this fraction of the finger. */
+const RUBBER = 1 / 3
+/** Momentum scrolling of the content after a fling (time constant, ms). */
+const MOMENTUM_TAU = 325
 /** Top of a fully expanded sheet (px from the viewport top), keeping the compact header visible. */
 export const SHEET_TOP = 76
 
@@ -22,7 +28,7 @@ interface SheetProps {
   onSnap: (index: number) => void
   /** Dragging/flicking below the lowest snap calls this (omit for a sheet that can't close). */
   onClose?: () => void
-  /** Drag zone: handle + header. Buttons and links inside it stay clickable. */
+  /** Top part: handle + header. */
   header: ReactNode
   children: ReactNode
   /** Visible height once settled, so the map can keep pins and fly-to targets clear. */
@@ -35,10 +41,32 @@ interface SheetProps {
   className?: string
 }
 
+interface Track {
+  id: number
+  x0: number
+  y0: number
+  y: number
+  mode: 'pending' | 'drag' | 'off'
+  /** Sheet height in finger units (above the top snap it is rubber-banded for display). */
+  raw: number
+  /** What the last movement did: moved the sheet or scrolled the content. */
+  last: 'sheet' | 'scroll'
+  samples: { t: number; y: number }[]
+}
+
 /**
- * Mobile bottom sheet with snap points. Drag the handle/header, flick to jump
- * a snap, tap the handle to step up (or back down from the top). The body
- * scrolls only at the top snap.
+ * Mobile bottom sheet with snap points, dragged from anywhere on it (Google
+ * Maps style). One vertical gesture moves the sheet and scrolls its content:
+ * below the top snap, dragging moves the sheet; at the top snap, dragging up
+ * scrolls the content, and dragging down scrolls it back to the top and then
+ * carries on moving the sheet, without lifting the finger. Horizontal swipes
+ * (photo gallery, chip rows) are left to the browser (they're `pan-x`), taps
+ * reach buttons as usual, and a drag that starts on a button doesn't press it.
+ * On release the sheet snaps by position and velocity; a flick steps one snap,
+ * and below the lowest snap it closes.
+ *
+ * The sheet is `touch-action: none` and scrolls its content itself (with
+ * momentum), because native scrolling can't hand a gesture back once started.
  */
 export function Sheet({
   snaps,
@@ -57,8 +85,12 @@ export function Sheet({
   const full = snaps[snaps.length - 1]
   const [drag, setDrag] = useState<number | null>(null)
   const [entered, setEntered] = useState(false)
-  const track = useRef<{ y: number; h: number; samples: { t: number; y: number }[]; moved: boolean } | null>(null)
+  const track = useRef<Track | null>(null)
+  const body = useRef<HTMLDivElement>(null)
+  const momentum = useRef(0)
+  const suppressClickUntil = useRef(0)
   const index = Math.min(snap, snaps.length - 1)
+  const atTop = index === snaps.length - 1
   const visible = drag ?? (entered ? snaps[index] : 0)
 
   useEffect(() => {
@@ -69,6 +101,14 @@ export function Sheet({
   useEffect(() => {
     if (drag === null && entered) onHeight?.(snaps[index])
   }, [drag, entered, index, snaps, onHeight])
+
+  // Content below the top snap always shows from its start.
+  useLayoutEffect(() => {
+    if (!atTop && body.current) body.current.scrollTop = 0
+  }, [atTop])
+
+  const stopMomentum = () => cancelAnimationFrame(momentum.current)
+  useEffect(() => stopMomentum, [])
 
   const settle = useCallback(
     (h: number, velocity: number) => {
@@ -86,55 +126,144 @@ export function Sheet({
     [snaps, index, onSnap, onClose],
   )
 
+  const shown = (raw: number) => (raw > full ? full + (raw - full) * RUBBER : Math.max(0, raw))
+
   const onPointerDown = (e: React.PointerEvent) => {
-    if ((e.target as HTMLElement).closest('button, a, input, [role=listbox]')) return
-    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-    track.current = { y: e.clientY, h: snaps[index], samples: [{ t: e.timeStamp, y: e.clientY }], moved: false }
-  }
-  const onPointerMove = (e: React.PointerEvent) => {
-    const tr = track.current
-    if (!tr) return
-    const dy = e.clientY - tr.y
-    if (!tr.moved && Math.abs(dy) < 6) return
-    tr.moved = true
-    tr.samples.push({ t: e.timeStamp, y: e.clientY })
-    while (tr.samples.length > 2 && e.timeStamp - tr.samples[0].t > 90) tr.samples.shift()
-    let h = tr.h - dy
-    if (h > full) h = full + (h - full) / 3 // rubber band past the top
-    setDrag(Math.max(0, h))
-  }
-  const onPointerUp = (e: React.PointerEvent) => {
-    const tr = track.current
-    track.current = null
-    if (!tr || !tr.moved) return
-    const a = tr.samples[0], b = tr.samples[tr.samples.length - 1]
-    // A finger that paused before lifting isn't a flick.
-    const fresh = e.timeStamp - b.t < 60
-    const v = fresh && b.t > a.t ? (b.y - a.y) / (b.t - a.t) : 0
-    const h = drag ?? snaps[index]
-    setDrag(null)
-    settle(h, v)
+    if (track.current || (e.pointerType === 'mouse' && e.button !== 0)) return
+    stopMomentum()
+    track.current = {
+      id: e.pointerId,
+      x0: e.clientX,
+      y0: e.clientY,
+      y: e.clientY,
+      mode: 'pending',
+      raw: snaps[index],
+      last: 'sheet',
+      samples: [{ t: e.timeStamp, y: e.clientY }],
+    }
   }
 
-  const atTop = index === snaps.length - 1
+  const onPointerMove = (e: React.PointerEvent) => {
+    const tr = track.current
+    if (!tr || tr.id !== e.pointerId || tr.mode === 'off') return
+    if (tr.mode === 'pending') {
+      const dx = e.clientX - tr.x0, dy = e.clientY - tr.y0
+      if (Math.hypot(dx, dy) < LOCK) return
+      if (Math.abs(dx) > Math.abs(dy)) {
+        tr.mode = 'off' // horizontal: a gallery / chip row swipe, or nothing
+        return
+      }
+      tr.mode = 'drag'
+      tr.y = e.clientY
+      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    }
+    let d = e.clientY - tr.y // > 0: finger moving down
+    tr.y = e.clientY
+    tr.samples.push({ t: e.timeStamp, y: e.clientY })
+    while (tr.samples.length > 2 && e.timeStamp - tr.samples[0].t > 90) tr.samples.shift()
+    const el = body.current
+    const maxScroll = el ? el.scrollHeight - el.clientHeight : 0
+    if (d < 0) {
+      // Up: expand the sheet to the top snap, then scroll the content, then rubber-band.
+      let up = -d
+      if (tr.raw < full) {
+        const take = Math.min(up, full - tr.raw)
+        tr.raw += take
+        up -= take
+        tr.last = 'sheet'
+      }
+      if (up > 0 && el && el.scrollTop < maxScroll - 0.5 && tr.raw <= full) {
+        const take = Math.min(up, maxScroll - el.scrollTop)
+        el.scrollTop += take
+        up -= take
+        tr.last = 'scroll'
+      }
+      if (up > 0) {
+        tr.raw += up
+        tr.last = 'sheet'
+      }
+    } else if (d > 0) {
+      // Down: undo any rubber band, scroll the content back to its top, then move the sheet.
+      if (tr.raw > full) {
+        const take = Math.min(d, tr.raw - full)
+        tr.raw -= take
+        d -= take
+      }
+      if (d > 0 && el && el.scrollTop > 0) {
+        const take = Math.min(d, el.scrollTop)
+        el.scrollTop -= take
+        d -= take
+        tr.last = 'scroll'
+      }
+      if (d > 0) {
+        tr.raw -= d
+        tr.last = 'sheet'
+      }
+    }
+    setDrag(shown(tr.raw))
+  }
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    const tr = track.current
+    if (!tr || tr.id !== e.pointerId) return
+    track.current = null
+    if (tr.mode !== 'drag') return
+    suppressClickUntil.current = performance.now() + 400
+    const a = tr.samples[0], b = tr.samples[tr.samples.length - 1]
+    // A finger that paused before lifting isn't a flick; a cancelled gesture never is.
+    const fresh = e.type === 'pointerup' && e.timeStamp - b.t < 60
+    const v = fresh && b.t > a.t ? (b.y - a.y) / (b.t - a.t) : 0
+    setDrag(null)
+    if (tr.last === 'scroll' && tr.raw === full) {
+      // The gesture expanded the sheet and went on into the content: stay at the top snap.
+      if (!atTop) onSnap(snaps.length - 1)
+      return scrollMomentum(-v)
+    }
+    settle(shown(tr.raw), v)
+  }
+
+  /** Keep the content gliding after a fling, decaying like native momentum scrolling. */
+  const scrollMomentum = (v0: number) => {
+    const el = body.current
+    if (!el || Math.abs(v0) < 0.05) return
+    let v = v0, t = performance.now()
+    const step = (now: number) => {
+      const dt = Math.min(32, now - t)
+      t = now
+      const before = el.scrollTop
+      el.scrollTop += v * dt
+      v *= Math.exp(-dt / MOMENTUM_TAU)
+      if (Math.abs(v) > 0.02 && el.scrollTop !== before) momentum.current = requestAnimationFrame(step)
+    }
+    momentum.current = requestAnimationFrame(step)
+  }
+
+  // A drag that started on a button or link must not press it.
+  const onClickCapture = (e: React.MouseEvent) => {
+    if (performance.now() < suppressClickUntil.current) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+  }
+
   return (
     <section
       role="dialog"
       aria-modal="false"
       aria-labelledby={labelledBy}
       aria-label={label}
-      className={`pointer-events-auto fixed inset-x-0 bottom-0 z-30 flex flex-col rounded-t-3xl bg-white shadow-[0_-8px_32px_-8px_rgba(0,43,42,0.25)] ring-1 ring-black/5 ${
+      data-sheet
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onClickCapture={onClickCapture}
+      className={`pointer-events-auto fixed inset-x-0 bottom-0 z-30 flex touch-none flex-col rounded-t-3xl bg-white shadow-[0_-8px_32px_-8px_rgba(0,43,42,0.25)] ring-1 ring-black/5 ${
         drag === null ? 'transition-transform duration-300 ease-out motion-reduce:transition-none' : ''
       } ${className}`}
       style={{ height: full, transform: `translateY(${full - visible}px)` }}
     >
-      <div
-        className="cursor-grab touch-none px-4 pt-2 pb-3 active:cursor-grabbing"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-      >
+      <div className="px-4 pt-2 pb-3">
         <button
           type="button"
           onClick={() => onSnap(atTop ? Math.max(0, index - 1) : index + 1)}
@@ -147,8 +276,12 @@ export function Sheet({
         {header}
       </div>
       <div
-        className={`min-h-0 flex-1 overscroll-contain px-4 pb-[max(1rem,env(safe-area-inset-bottom))] ${
-          atTop && drag === null ? 'overflow-y-auto' : 'overflow-hidden'
+        ref={body}
+        data-sheet-body
+        // touch-none here too: touch-action stops at the nearest scroller, so the content
+        // must opt out of native scrolling itself (the sheet scrolls it, see above).
+        className={`min-h-0 flex-1 touch-none overscroll-contain px-4 pb-[max(1rem,env(safe-area-inset-bottom))] ${
+          atTop ? 'overflow-y-auto' : 'overflow-hidden'
         }`}
       >
         {children}
