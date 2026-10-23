@@ -8,10 +8,16 @@
     <meta name="description" content="แผนที่ 3 มิติ มหาวิทยาลัยเกษตรศาสตร์ บางเขน — 3D Kasetsart University Bangkhen campus map" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Non-blocking web font: text paints immediately in the fallback, then swaps. -->
     <link
+      rel="preload"
+      as="style"
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
+      onload="this.onload=null;this.rel='stylesheet'"
     />
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" />
+    </noscript>
     <title>แผนที่มหาวิทยาลัยเกษตรศาสตร์ บางเขน</title>
   </head>
   <body>

@@ -9,7 +9,7 @@ import { palette } from './palette'
 
 const ROAD_WIDTH = { main: 9, minor: 5.5, path: 2.2 } as const
 
-/** The OSM-derived base map: ground, campus plate, green, water, roads, plain buildings. */
+/** The OSM-derived base map: ground, campus plate, green, water, roads. */
 export function BaseLayers() {
   const geo = useMemo(() => {
     const inside = <T extends Feature>(fs: T[], v: boolean) =>
@@ -35,7 +35,6 @@ export function BaseLayers() {
         }),
       )
 
-    const plainBuildings = buildings.features.filter((f) => !modelledBuildingIds.has(f.properties.id))
     const mainIn = roadLines('main', true)
     const mainOut = roadLines('main', false)
 
@@ -58,16 +57,6 @@ export function BaseLayers() {
       mainIn: ribbons(mainIn, ROAD_WIDTH.main, 0.15),
       dashes: dashes([...mainIn, ...mainOut], 0.35, 3, 4, 0.2),
       paths: ribbons(roadLines('path', true), ROAD_WIDTH.path, 0.13),
-      buildingsIn: colorByFacing(
-        extrudedPolygons(inside(plainBuildings, true), buildingHeight),
-        palette.building,
-        palette.buildingRoof,
-      ),
-      buildingsOut: colorByFacing(
-        extrudedPolygons(inside(plainBuildings, false), buildingHeight),
-        palette.buildingOutside,
-        palette.buildingRoof,
-      ),
     }
   }, [])
 
@@ -101,8 +90,24 @@ export function BaseLayers() {
           </mesh>
         ),
       )}
-      <mesh geometry={geo.buildingsOut} castShadow receiveShadow material={materials.building} />
-      <mesh geometry={geo.buildingsIn} castShadow receiveShadow material={materials.building} />
     </group>
   )
+}
+
+/**
+ * Plain (non-landmark) building blocks, inside or outside the campus. Split
+ * from BaseLayers so the scene can build them in separate tasks.
+ */
+export function BuildingBlocks({ inside }: { inside: boolean }) {
+  const geometry = useMemo(() => {
+    const plain = buildings.features.filter(
+      (f) => !modelledBuildingIds.has(f.properties.id) && f.properties.inside === inside,
+    )
+    return colorByFacing(
+      extrudedPolygons(plain, buildingHeight),
+      inside ? palette.building : palette.buildingOutside,
+      palette.buildingRoof,
+    )
+  }, [inside])
+  return <mesh geometry={geometry} castShadow receiveShadow material={materials.building} />
 }

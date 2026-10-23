@@ -1,11 +1,11 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { campusBoundary } from '../data/osm'
 import { landmarks } from '../data/landmarks'
-import { BaseLayers } from './BaseLayers'
+import { BaseLayers, BuildingBlocks } from './BaseLayers'
 import { LandmarkModels, buildLandmarkModels } from './LandmarkModels'
 import { PinProjector } from './Pins'
 import { ShuttleLayer } from './ShuttleLayer'
@@ -195,10 +195,27 @@ function Sun({ controls }: { controls: React.RefObject<OrbitControlsImpl | null>
   )
 }
 
+/**
+ * Build the scene in stages, one per task, so no single main-thread task is
+ * long: ground/roads/buildings first, then trees, then detailed landmarks and
+ * pins. Each stage yields to the browser before the next.
+ */
+function useStage(max: number) {
+  const [stage, setStage] = useState(0)
+  useEffect(() => {
+    if (stage >= max) return
+    const id = window.setTimeout(() => setStage((s) => s + 1), 0)
+    return () => window.clearTimeout(id)
+  }, [stage, max])
+  return stage
+}
+
 function Scene({ shuttleOn, activeLine }: CampusMapProps) {
   const controls = useRef<OrbitControlsImpl>(null)
-  const models = useMemo(() => buildLandmarkModels(), [])
-  const heights = useMemo(() => pinHeights(landmarks, models.tops), [models])
+  const stage = useStage(4)
+  const modelsDue = stage >= 4
+  const models = useMemo(() => (modelsDue ? buildLandmarkModels() : null), [modelsDue])
+  const heights = useMemo(() => (models ? pinHeights(landmarks, models.tops) : null), [models])
 
   return (
     <>
@@ -206,9 +223,11 @@ function Scene({ shuttleOn, activeLine }: CampusMapProps) {
       <hemisphereLight args={['#ffffff', '#d4ddd6', 1.73]} />
       <Sun controls={controls} />
       <BaseLayers />
-      <Trees shadows />
-      <LandmarkModels models={models} />
-      <PinProjector landmarks={landmarks} heights={heights} />
+      {stage >= 1 && <BuildingBlocks inside />}
+      {stage >= 2 && <BuildingBlocks inside={false} />}
+      {stage >= 3 && <Trees shadows />}
+      {models && <LandmarkModels models={models} />}
+      {heights && <PinProjector landmarks={landmarks} heights={heights} />}
       {shuttleOn && <ShuttleLayer activeLine={activeLine} />}
       {shuttleOn && <StopProjector />}
       <OrbitControls

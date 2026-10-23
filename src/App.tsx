@@ -34,6 +34,12 @@ export default function App() {
   const [selectedId, select] = useSelection()
   const selected = selectedId ? landmarkById.get(selectedId) ?? null : null
   const mapRef = useRef<HTMLDivElement>(null)
+  // Start loading the 3D scene only after the UI shell has painted.
+  const [sceneStarted, setSceneStarted] = useState(false)
+  useEffect(() => {
+    let id = requestAnimationFrame(() => (id = requestAnimationFrame(() => setSceneStarted(true))))
+    return () => cancelAnimationFrame(id)
+  }, [])
   const sheetHeight = useRef(0)
   const searchBarHeight = useRef(0)
   const [chips, setChips] = useState<Set<ChipId>>(() => new Set())
@@ -246,10 +252,14 @@ export default function App() {
         ref={mapRef}
         className="absolute inset-0 touch-none select-none [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none]"
       >
-        <Suspense fallback={<MapSkeleton />}>
-          {/* Touch gestures attach inside the scene chunk (they drive the camera controller). */}
-          <CampusMap shuttleOn={shuttleOn} activeLine={activeLine} gestureTarget={mapRef} onTap={tapAt} />
-        </Suspense>
+        {sceneStarted ? (
+          <Suspense fallback={<MapSkeleton />}>
+            {/* Touch gestures attach inside the scene chunk (they drive the camera controller). */}
+            <CampusMap shuttleOn={shuttleOn} activeLine={activeLine} gestureTarget={mapRef} onTap={tapAt} />
+          </Suspense>
+        ) : (
+          <MapSkeleton />
+        )}
         <PinLayer landmarks={landmarks} selectedId={selectedId} onSelect={selectPlace} />
         {shuttleOn && <StopLayer selectedId={stopId} onSelect={(id) => selectStop(id)} />}
       </div>

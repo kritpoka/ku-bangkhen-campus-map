@@ -52,9 +52,13 @@ const place = (page) => page.evaluate(() => new URL(location.href).searchParams.
   await page.keyboard.press('Escape') // close the card too
   await page.waitForTimeout(300)
   await page.locator('header button[aria-pressed]', { hasText: 'อาหาร' }).click()
-  await page.waitForTimeout(400)
+  // The projector applies filters on the next rendered frame.
+  await page
+    .waitForFunction(() => [...document.querySelectorAll('[data-mode]')].filter((e) => e.dataset.mode !== 'hidden').length <= 3, null, { timeout: 4000 })
+    .catch(() => {})
   const vis = await page.evaluate(() => [...(window.__kuMap.pins.visible ?? [])])
-  const shown = await page.evaluate(() => [...document.querySelectorAll('[data-mode]')].filter((e) => e.dataset.mode !== 'hidden').length)
+  const shownLabels = await page.evaluate(() => [...document.querySelectorAll('[data-mode]')].filter((e) => e.dataset.mode !== 'hidden').map((e) => e.querySelector('button')?.getAttribute('aria-label')))
+  const shown = shownLabels.length
   check('food chip limits pins to food places', vis.length === 3 && shown <= 3, `${vis.join(', ')} (${shown} pins drawn)`)
   await input.fill('คณะ')
   await page.waitForTimeout(200)
