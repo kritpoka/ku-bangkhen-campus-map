@@ -136,7 +136,8 @@ export function MobileSearch({ expanded, onExpand, onCollapse, chips, onChips, c
               </button>
             )}
           </div>
-          <FilterChips active={chips} onChange={onChips} className="-mx-4 px-4" />
+          {/* py-3: 12 px more air above and below the chips (also room for their shadow and focus ring). */}
+          <FilterChips active={chips} onChange={onChips} className="-mx-4 px-4 py-3" />
         </div>
       }
     >
