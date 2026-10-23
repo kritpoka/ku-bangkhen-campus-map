@@ -1,5 +1,5 @@
 import { Bus, X } from 'lucide-react'
-import { useId, useMemo, useState } from 'react'
+import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { shuttleLines, shuttleStopById } from '../data/shuttle'
 import type { Lang } from '../i18n'
@@ -46,28 +46,67 @@ export function ShuttleLegendCard({ activeLine, onLine, onStop, onClose }: Legen
   )
 }
 
-/** Mobile: line chips shown above the bottom search bar while the overlay is on. */
-export function LineChips({ activeLine, onLine }: { activeLine: string | null; onLine: (id: string | null) => void }) {
+/**
+ * Mobile: line chips shown above the bottom search bar while the overlay is
+ * on, ending with a chip that closes the overlay. The scroller is the only
+ * pointer-active part (the bar around it is pointer-transparent, so empty
+ * space still reaches the map); `touch-action: pan-x` lets a swipe scroll the
+ * row, and a swipe never fires a click, so only a tap toggles a chip.
+ */
+export function LineChips({ activeLine, onLine, onClose }: { activeLine: string | null; onLine: (id: string | null) => void; onClose: () => void }) {
   const { t, i18n } = useTranslation()
   const lang = (i18n.resolvedLanguage ?? 'th') as Lang
+  const [atEnd, setAtEnd] = useState(false)
+  const scroller = useRef<HTMLDivElement>(null)
+  const measure = () => {
+    const el = scroller.current
+    if (el) setAtEnd(el.scrollLeft + el.clientWidth >= el.scrollWidth - 4)
+  }
+  useLayoutEffect(() => {
+    const el = scroller.current
+    if (!el) return
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [lang])
   return (
-    <div role="group" aria-label={t('shuttle.title')} className="flex gap-2 overflow-x-auto px-3 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      {shuttleLines.map((l) => {
-        const active = l.id === activeLine
-        return (
-          <button
-            key={l.id}
-            type="button"
-            aria-pressed={active}
-            onClick={() => onLine(active ? null : l.id)}
-            className="pointer-events-auto flex h-9 shrink-0 items-center gap-2 rounded-full bg-white/95 px-3 text-[13px] leading-normal font-semibold whitespace-nowrap text-slate-800 shadow-sm ring-1 ring-black/8 focus-visible:outline-2 focus-visible:outline-ku-600"
-            style={active ? { backgroundColor: l.color, color: '#fff' } : undefined}
-          >
-            <LineSwatch line={l} className={active ? 'opacity-0' : ''} />
-            {l.name[lang]}
-          </button>
-        )
-      })}
+    <div className="pb-2">
+      <div
+        ref={scroller}
+        role="group"
+        aria-label={t('shuttle.title')}
+        onScroll={measure}
+        data-line-chips
+        className={`pointer-events-auto flex w-fit max-w-full touch-pan-x scroll-px-3 gap-2 overflow-x-auto overscroll-x-contain px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+          atEnd ? '' : '[mask-image:linear-gradient(to_right,#000_calc(100%-28px),transparent)]'
+        }`}
+      >
+        {shuttleLines.map((l) => {
+          const active = l.id === activeLine
+          return (
+            <button
+              key={l.id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onLine(active ? null : l.id)}
+              className="flex h-9 shrink-0 items-center gap-2 rounded-full bg-white/95 px-3 text-[13px] leading-normal font-semibold whitespace-nowrap text-slate-800 shadow-sm ring-1 ring-black/8 focus-visible:outline-2 focus-visible:outline-ku-600"
+              style={active ? { backgroundColor: l.color, color: '#fff' } : undefined}
+            >
+              <LineSwatch line={l} className={active ? 'opacity-0' : ''} />
+              {l.name[lang]}
+            </button>
+          )
+        })}
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-slate-800/90 px-3 text-[13px] leading-normal font-medium whitespace-nowrap text-white shadow-sm focus-visible:outline-2 focus-visible:outline-ku-600"
+        >
+          <X className="size-4" aria-hidden />
+          {t('shuttle.close')}
+        </button>
+      </div>
     </div>
   )
 }

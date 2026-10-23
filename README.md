@@ -204,9 +204,10 @@ skeleton. The scene builds in several short tasks, renders only on demand
 1. Import the repository in Vercel. It detects Vite; `vercel.json` sets the
    build command, output directory, SPA rewrites and asset caching.
 2. Under Project → Settings → Environment Variables, set **`VITE_SITE_URL`**
-   to your production URL (for example `https://ku-map.vercel.app`). Link
-   previews in LINE, Facebook and X need absolute image URLs. The default in
-   `.env` is only a placeholder.
+   to your production URL with no trailing slash (for example
+   `https://ku-map.vercel.app`). Link previews in LINE, Facebook and X need
+   absolute image URLs. The value in `.env` is only a placeholder: builds on
+   Vercel or CI **fail** while it is unchanged, and local builds print a warning.
 3. Deploy. Deep links like `https://<site>/?place=library` open that place
    directly.
 

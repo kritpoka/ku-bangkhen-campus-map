@@ -100,6 +100,42 @@ const TOGGLE = 'button[aria-label="แสดงเส้นทางรถตะ
   await ctx.close()
 }
 
+// ─── Mobile, 375 px: the line chips row scrolls by swipe, tap still toggles ─
+{
+  const { ctx, page } = await open({ viewport: { width: 375, height: 667 }, isMobile: true, hasTouch: true })
+  await page.tap(TOGGLE)
+  await page.waitForTimeout(700)
+  check('375 px: category chips are hidden while the overlay is on', (await page.locator('[role=group][aria-label="กรองตามหมวดหมู่"]').count()) === 0)
+  const row = page.locator('[data-line-chips]')
+  const dims = await row.evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth, top: el.getBoundingClientRect().top }))
+  check('375 px: the line chips row overflows (so there is something to swipe)', dims.sw > dims.cw, `${dims.sw} > ${dims.cw}`)
+  const cam = () => page.evaluate(() => { const c = window.__kuMap.camera.read(); return JSON.stringify([c.target.x, c.target.z, c.distance, c.azimuth, c.polar]) })
+  const cam0 = await cam()
+  const pressed0 = await row.locator('button[aria-pressed=true]').count()
+  const cdp = await ctx.newCDPSession(page)
+  let t = Date.now() / 1000
+  const touch = (type, pts, adv = 16) => cdp.send('Input.dispatchTouchEvent', { type, timestamp: (t += adv / 1000), touchPoints: pts })
+  const y = dims.top + 18
+  // Start on a chip (the worst case: a swipe must not count as a tap on it).
+  await touch('touchStart', [{ id: 1, x: 150, y }], 0)
+  for (let i = 1; i <= 10; i++) await touch('touchMove', [{ id: 1, x: 150 - i * 14, y }])
+  await touch('touchEnd', [])
+  await page.waitForTimeout(500)
+  check('375 px: swiping the chips row scrolls it', (await row.evaluate((el) => el.scrollLeft)) > 0, `scrollLeft ${await row.evaluate((el) => el.scrollLeft)}`)
+  check('375 px: the swipe toggled no chip and opened no sheet', (await row.locator('button[aria-pressed=true]').count()) === pressed0 && (await page.locator('section[role=dialog]').count()) === 0)
+  check('375 px: the swipe did not move the map camera', (await cam()) === cam0)
+  await row.evaluate((el) => (el.scrollLeft = 0))
+  await page.tap('[data-line-chips] button:has-text("สาย 3")')
+  await page.waitForTimeout(500)
+  check('375 px: a tap on a chip still selects its line', await page.locator('section[role=dialog] h2', { hasText: 'สาย 3' }).isVisible())
+  await page.tap('section[role=dialog] button[aria-label="ปิด"]')
+  await page.waitForTimeout(400)
+  await page.tap('[data-line-chips] button:has-text("ปิดรถตะลัย")')
+  await page.waitForTimeout(500)
+  check('375 px: the close chip turns the overlay off and brings the category chips back', (await row.count()) === 0 && (await page.locator('[role=group][aria-label="กรองตามหมวดหมู่"]').count()) === 1)
+  await ctx.close()
+}
+
 check('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '))
 console.log(`\n${results.filter(Boolean).length}/${results.length} passed`)
 await browser.close()

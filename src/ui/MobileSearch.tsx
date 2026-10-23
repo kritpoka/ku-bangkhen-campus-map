@@ -23,6 +23,8 @@ interface Props {
   onHeight: (px: number) => void
   /** Extra row above the filter chips in the collapsed bar (e.g. shuttle lines). */
   aboveChips?: ReactNode
+  /** Hide the category chips (the shuttle line chips take their place). */
+  hideChips?: boolean
 }
 
 /**
@@ -30,7 +32,7 @@ interface Props {
  * it) at the bottom of the screen; tapping it expands a full-height sheet with
  * the input, chips and results.
  */
-export function MobileSearch({ expanded, onExpand, onCollapse, chips, onChips, categories, onPick, onHeight, aboveChips }: Props) {
+export function MobileSearch({ expanded, onExpand, onCollapse, chips, onChips, categories, onPick, onHeight, aboveChips, hideChips }: Props) {
   const { t } = useTranslation()
   const listId = useId()
   const vh = useViewportHeight()
@@ -61,7 +63,7 @@ export function MobileSearch({ expanded, onExpand, onCollapse, chips, onChips, c
     return (
       <div ref={bar} className="pointer-events-none fixed inset-x-0 bottom-0 z-20 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         {aboveChips}
-        <FilterChips active={chips} onChange={onChips} className="pointer-events-auto px-3 pb-2" />
+        {!hideChips && <FilterChips active={chips} onChange={onChips} className="pointer-events-auto px-3 pb-2" />}
         <div className="px-3">
           <button
             type="button"

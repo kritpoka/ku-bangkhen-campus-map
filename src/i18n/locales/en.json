@@ -78,6 +78,7 @@
     "title": "KU Shuttle",
     "toggle": "Show shuttle routes",
     "hide": "Hide shuttle routes",
+    "close": "Close shuttle",
     "stop": "Shuttle stop",
     "servedBy": "Lines serving this stop",
     "noLines": "This stop isn’t on KU’s official route map",

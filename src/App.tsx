@@ -288,7 +288,8 @@ export default function App() {
         ))}
       {!isDesktop && !sheetOpen && (
         <MobileSearch
-          aboveChips={shuttleOn ? <LineChips activeLine={activeLine} onLine={setActiveLine} /> : undefined}
+          aboveChips={shuttleOn ? <LineChips activeLine={activeLine} onLine={setActiveLine} onClose={toggleShuttle} /> : undefined}
+          hideChips={shuttleOn}
           expanded={searchOpen}
           onExpand={openSearch}
           onCollapse={closeSearch}
