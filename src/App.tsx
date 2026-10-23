@@ -26,12 +26,15 @@ import { stopBridge } from './scene/stopBridge'
 import { StopLayer } from './ui/StopLayer'
 import { LineChips, LineSheet, ShuttleLegendCard, StopCard, StopSheet } from './ui/ShuttlePanels'
 import './ui/shuttleSearch'
+import { DEBUG, usePerfFlags } from './lib/perf'
+import { DebugOverlay } from './ui/DebugOverlay'
 
 /** Camera distance (m) when focusing a place; closer views are kept. */
 const FOCUS_DISTANCE = { desktop: 460, mobile: 560 }
 
 export default function App() {
   const isDesktop = useMediaQuery(DESKTOP_QUERY)
+  const flags = usePerfFlags()
   const [selectedId, select] = useSelection()
   const selected = selectedId ? landmarkById.get(selectedId) ?? null : null
   const mapRef = useRef<HTMLDivElement>(null)
@@ -270,8 +273,8 @@ export default function App() {
         ) : (
           <MapSkeleton />
         )}
-        <PinLayer landmarks={landmarks} selectedId={selectedId} onSelect={selectPlace} />
-        {shuttleOn && <StopLayer selectedId={stopId} onSelect={(id) => selectStop(id)} />}
+        {flags.pins && <PinLayer landmarks={landmarks} selectedId={selectedId} onSelect={selectPlace} />}
+        {shuttleOn && flags.stops && <StopLayer selectedId={stopId} onSelect={(id) => selectStop(id)} />}
       </div>
       <Header isDesktop={isDesktop} chips={chips} onChips={onChips} categories={categories} onPick={pick} />
       <MapControls
@@ -309,6 +312,7 @@ export default function App() {
         />
       )}
       {isDesktop && <Attribution />}
+      {DEBUG && <DebugOverlay />}
     </div>
   )
 }

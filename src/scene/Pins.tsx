@@ -74,7 +74,10 @@ export function PinProjector({ landmarks, heights }: { landmarks: Landmark[]; he
       }),
       v: new THREE.Vector3(),
       lastMatrix: new THREE.Matrix4(),
-      lastSize: '',
+      lastW: 0,
+      lastH: 0,
+      // What was last written to each element, so unchanged values aren't rewritten.
+      written: landmarks.map(() => ({ el: null as HTMLElement | null, x: NaN, y: NaN, mode: '' as PinMode | '', z: -1 })),
       widths: new Float32Array(landmarks.length),
       widthsKey: '',
       order: landmarks.map((_, i) => i),
@@ -117,10 +120,12 @@ export function PinProjector({ landmarks, heights }: { landmarks: Landmark[]; he
   useFrame(({ camera }) => {
     // useFrame runs before the renderer refreshes matrices; use this frame's pose.
     camera.updateMatrixWorld()
-    const sizeKey = `${size.width}x${size.height}`
-    if (!pinBridge.dirty && sizeKey === s.lastSize && camera.matrixWorld.equals(s.lastMatrix)) return
+    const resized = size.width !== s.lastW || size.height !== s.lastH
+    const dirty = pinBridge.dirty
+    if (!dirty && !resized && camera.matrixWorld.equals(s.lastMatrix)) return
     pinBridge.dirty = false
-    s.lastSize = sizeKey
+    s.lastW = size.width
+    s.lastH = size.height
     s.lastMatrix.copy(camera.matrixWorld)
 
     const { lang, selectedId, insets, visible } = pinBridge
@@ -129,8 +134,11 @@ export function PinProjector({ landmarks, heights }: { landmarks: Landmark[]; he
       s.widthsKey = widthsKey
       landmarks.forEach((l, i) => (s.widths[i] = textWidth(labelText(l, lang)) + LABEL_PAD))
     }
-    const rank = (i: number) => (landmarks[i].id === selectedId ? 0 : landmarks[i].featured ? 1 : 2)
-    s.order.sort((a, b) => rank(a) - rank(b) || a - b)
+    // Priority order only changes with the selection (a dirty update).
+    if (dirty) {
+      const rank = (i: number) => (landmarks[i].id === selectedId ? 0 : landmarks[i].featured ? 1 : 2)
+      s.order.sort((a, b) => rank(a) - rank(b) || a - b)
+    }
 
     const target = controls?.target
     const zoom = target ? camera.position.distanceTo(target) / pinBridge.fitDistance : 1
@@ -175,18 +183,32 @@ export function PinProjector({ landmarks, heights }: { landmarks: Landmark[]; he
       }
     }
 
-    // Write straight to the DOM.
-    landmarks.forEach((l, i) => {
-      const el = pinBridge.elements.get(l.id)
-      if (!el) return
-      el.style.transform = `translate3d(${screen[i * 2].toFixed(1)}px, ${screen[i * 2 + 1].toFixed(1)}px, 0)`
-      if (el.dataset.mode !== modes[i]) {
-        el.dataset.mode = modes[i]
-        el.inert = modes[i] === 'hidden'
+    // Write straight to the DOM, only what changed: hidden pins that stay
+    // hidden aren't touched, and each value is written only when it differs.
+    for (let i = 0; i < landmarks.length; i++) {
+      const el = pinBridge.elements.get(landmarks[i].id)
+      if (!el) continue
+      const w = s.written[i], mode = modes[i]
+      if (w.el !== el) Object.assign(w, { el, x: NaN, y: NaN, mode: '', z: -1 }) // new element: write everything
+      if (mode !== w.mode) {
+        w.mode = el.dataset.mode = mode
+        el.inert = mode === 'hidden'
+      }
+      if (mode === 'hidden') continue
+      const x = screen[i * 2], y = screen[i * 2 + 1]
+      // Negated so the initial NaN (never written) counts as moved.
+      if (!(Math.abs(x - w.x) <= 0.05 && Math.abs(y - w.y) <= 0.05)) {
+        w.x = x
+        w.y = y
+        el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`
       }
       // Labels stack above dots; the selected pin above everything.
-      el.style.zIndex = String(l.id === selectedId ? 3 : modes[i] === 'label' ? 2 : 1)
-    })
+      const z = landmarks[i].id === selectedId ? 3 : mode === 'label' ? 2 : 1
+      if (z !== w.z) {
+        w.z = z
+        el.style.zIndex = String(z)
+      }
+    }
   })
 
   return null

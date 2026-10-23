@@ -20,7 +20,13 @@ export function StopProjector() {
       shown: new Uint8Array(shuttleStops.length),
       v: new THREE.Vector3(),
       lastMatrix: new THREE.Matrix4(),
-      lastSize: '',
+      lastW: 0,
+      lastH: 0,
+      // Last written position / mode per element, so unchanged values aren't rewritten.
+      wx: new Float32Array(shuttleStops.length).fill(NaN),
+      wy: new Float32Array(shuttleStops.length).fill(NaN),
+      wmode: [] as string[],
+      wel: [] as (HTMLElement | undefined)[],
     }),
     [],
   )
@@ -55,13 +61,15 @@ export function StopProjector() {
 
   useFrame(({ camera }) => {
     camera.updateMatrixWorld()
-    const key = `${size.width}x${size.height}`
-    if (!stopBridge.dirty && key === s.lastSize && camera.matrixWorld.equals(s.lastMatrix)) return
+    const resized = size.width !== s.lastW || size.height !== s.lastH
+    if (!stopBridge.dirty && !resized && camera.matrixWorld.equals(s.lastMatrix)) return
     stopBridge.dirty = false
-    s.lastSize = key
+    s.lastW = size.width
+    s.lastH = size.height
     s.lastMatrix.copy(camera.matrixWorld)
     const { insets } = pinBridge
-    s.stops.forEach((st, i) => {
+    for (let i = 0; i < s.stops.length; i++) {
+      const st = s.stops[i]
       s.v.copy(s.anchors[i]).project(camera)
       const x = (s.v.x * 0.5 + 0.5) * size.width
       const y = (-s.v.y * 0.5 + 0.5) * size.height
@@ -73,14 +81,24 @@ export function StopProjector() {
         x > insets.left && x < size.width - insets.right && y > insets.top && y < size.height - insets.bottom
       s.shown[i] = show ? 1 : 0
       const el = stopBridge.elements.get(st.id)
-      if (!el) return
-      el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`
+      if (!el) continue
+      if (s.wel[i] !== el) {
+        s.wel[i] = el // new element: write everything
+        s.wmode[i] = ''
+        s.wx[i] = s.wy[i] = NaN
+      }
       const mode = show ? 'shown' : 'hidden'
-      if (el.dataset.mode !== mode) {
-        el.dataset.mode = mode
+      if (s.wmode[i] !== mode) {
+        s.wmode[i] = el.dataset.mode = mode
         el.inert = !show
       }
-    })
+      // Hidden stops aren't moved; shown ones only when they actually moved.
+      if (show && !(Math.abs(x - s.wx[i]) <= 0.05 && Math.abs(y - s.wy[i]) <= 0.05)) { // NaN = never written
+        s.wx[i] = x
+        s.wy[i] = y
+        el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`
+      }
+    }
   })
   return null
 }

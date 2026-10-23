@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 
+/* Phones and tablets (touch-first). */
+@custom-variant coarse (@media (pointer: coarse));
+
 @theme {
   --font-sans: 'IBM Plex Sans Thai', ui-sans-serif, system-ui, sans-serif;
   --color-ku-50: #eef7f5;
@@ -34,4 +37,15 @@ body {
     opacity: 0;
     transform: translateX(12px);
   }
+}
+
+/*
+ * Backdrop blur off (set on touch devices by src/lib/perf.ts, and by the ?debug=1
+ * toggle): over a WebGL canvas that redraws every frame, iOS Safari re-blurs
+ * each blurred element's backdrop per frame, which costs frames while panning.
+ * The surfaces are near-opaque anyway.
+ */
+.no-backdrop-blur * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }

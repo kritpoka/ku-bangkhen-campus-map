@@ -200,9 +200,15 @@ These tests complement checking on real phones; they don't replace it. See
 
 The UI shell (124 KB gzipped) paints first. three.js, the scene and the map
 data (360 KB gzipped) load afterwards in a separate chunk, behind a loading
-skeleton. The scene builds in several short tasks, renders only on demand
-(nothing while idle), and caps the pixel ratio on phones. Measurements are in
+skeleton. The scene builds in several short tasks and renders only on demand
+(nothing while idle). Resolution adapts: full sharpness at rest, lower while
+the map moves; shadows are redrawn only at rest. Measurements are in
 `docs/performance.md`.
+
+Add `?debug=1` to the URL for a live overlay (frame rate, frame time, DPR,
+draw calls, triangles) with switches to turn shadows, backdrop blur, pins,
+shuttle stops and trees off, and to cap the resolution at 2.
+`node tests/perf/profile.mjs` measures the same costs in phone emulation.
 
 ---
 

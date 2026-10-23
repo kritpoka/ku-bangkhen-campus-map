@@ -10,7 +10,7 @@ page.on('pageerror', (e) => errors.push(e.message))
 await page.goto(URL, { waitUntil: 'networkidle' })
 await page.waitForFunction(() => window.__kuMap?.camera?.ready && window.__kuMap.camera.home)
 // Software GL is slow; render at low resolution so touch timing stays realistic.
-await page.evaluate(() => window.__kuMap.three().setDpr(0.4))
+await page.evaluate(() => window.__kuMap.capDpr(0.4))
 await page.waitForTimeout(1200)
 const cdp = await ctx.newCDPSession(page)
 
@@ -74,10 +74,11 @@ const check = (name, ok, detail) => {
 await reset()
 {
   const g0 = await ground(195, 500)
-  await gesture([{ id: 1, from: [195, 500], to: [195, 360] }], { steps: 14, stepMs: 30 })
+  await gesture([{ id: 1, from: [195, 500], to: [195, 360] }], { steps: 14, stepMs: 30, lift: false })
   await sleep(40)
+  // Measured with the finger still down: after lifting, a fling carries on (time-based).
   const g1 = await ground(195, 360)
-  // Finger paused-ish (30 ms steps) -> may fling a little; compare right after lift.
+  await touch('touchEnd', [], 8)
   check('1-finger drag pans (ground stays under finger)', Math.hypot(g0.x - g1.x, g0.z - g1.z) < 6, `drift ${Math.hypot(g0.x - g1.x, g0.z - g1.z).toFixed(2)} m`)
   await settled()
 }

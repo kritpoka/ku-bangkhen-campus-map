@@ -5,7 +5,7 @@ const page = await (await browser.newContext({ viewport: { width: 1280, height: 
 const errors = []; page.on('pageerror', (e) => errors.push(e.message))
 await page.goto(URL, { waitUntil: 'networkidle' })
 await page.waitForFunction(() => window.__kuMap?.camera?.home)
-await page.evaluate(() => window.__kuMap.three().setDpr(0.5))
+await page.evaluate(() => window.__kuMap.capDpr(0.5))
 await page.waitForTimeout(800)
 const st = () => page.evaluate(() => { const s = window.__kuMap.camera.read(); return { x: s.target.x, z: s.target.z, d: s.distance } })
 const url = () => page.evaluate(() => new URL(location.href).searchParams.get('place'))

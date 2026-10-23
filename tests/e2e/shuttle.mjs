@@ -14,7 +14,7 @@ async function open(ctxOpts) {
   page.on('pageerror', (e) => errors.push(e.message))
   await page.goto(URL, { waitUntil: 'networkidle' })
   await page.waitForFunction(() => window.__kuMap?.camera?.home)
-  await page.evaluate(() => window.__kuMap.three().setDpr(0.5))
+  await page.evaluate(() => window.__kuMap.capDpr(0.5))
   await page.waitForTimeout(700)
   return { ctx, page }
 }

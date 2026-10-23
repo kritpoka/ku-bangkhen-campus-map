@@ -19,6 +19,8 @@ import { Trees } from './Trees'
 import { palette } from './palette'
 import { pinHeights } from './pinAnchors'
 import { polygonsOf } from './geometry'
+import { usePerfFlags } from '../lib/perf'
+import { AdaptiveResolution, PerfProbe, motion, resolution } from './quality'
 
 /** Campus extent in scene coordinates (x east, z south), from the OSM boundary. */
 const CAMPUS = (() => {
@@ -113,6 +115,7 @@ function CameraRig({ controls }: { controls: React.RefObject<OrbitControlsImpl |
       camera: mapCamera,
       pins: pinBridge,
       stops: stopBridge,
+      capDpr: (d: number) => resolution.cap(d),
       view(x: number, z: number, d: number, az = 0, polar = DEFAULT_POLAR) {
         mapCamera.write({ target: new THREE.Vector3(x, 0, z), distance: d, azimuth: az, polar })
         controls.current?.update()
@@ -149,13 +152,27 @@ function CameraRig({ controls }: { controls: React.RefObject<OrbitControlsImpl |
 const SUN = new THREE.Vector3(-1, 1.1, 0.15).normalize()
 
 function Sun({ controls }: { controls: React.RefObject<OrbitControlsImpl | null> }) {
+  const flags = usePerfFlags()
   const light = useRef<THREE.DirectionalLight>(null)
   const lastHalf = useRef(0)
   const lastTarget = useRef(new THREE.Vector3(NaN, NaN, NaN))
-  const { camera, invalidate } = useThree()
+  const { camera, invalidate, gl } = useThree()
+
+  // The shadow map is redrawn only at rest (see below), not every frame.
+  useEffect(() => {
+    gl.shadowMap.autoUpdate = false
+    gl.shadowMap.needsUpdate = true
+    return () => void (gl.shadowMap.autoUpdate = true)
+  }, [gl])
+
   useFrame(() => {
     const l = light.current, c = controls.current
     if (!l || !c) return
+    // While the map moves, keep the sun and its shadow map where they are: the
+    // shadows stay correct in world space, and frames skip the shadow pass (13
+    // draw calls over every building and tree). At rest it follows the view again.
+    if (motion.moving) return
+    gl.shadowMap.needsUpdate = true
     const t = c.target
     // This may run before the controls update this frame; if the sun had to
     // move, render one more frame so the resting view gets correct shadows.
@@ -184,7 +201,7 @@ function Sun({ controls }: { controls: React.RefObject<OrbitControlsImpl | null>
       ref={light}
       intensity={1.92}
       color="#fffaf0"
-      castShadow
+      castShadow={flags.shadows}
       shadow-mapSize={[mapSize, mapSize]}
       shadow-camera-near={10}
       shadow-camera-far={3500}
@@ -210,26 +227,44 @@ function useStage(max: number) {
   return stage
 }
 
+/**
+ * Compile every material in the scene once the last build stage is in, so
+ * objects that start off-screen don't compile shaders mid-gesture when a pan
+ * first brings them into view.
+ */
+function Precompile({ ready }: { ready: boolean }) {
+  const { gl, scene, camera } = useThree()
+  useEffect(() => {
+    if (!ready) return
+    const id = window.setTimeout(() => void gl.compileAsync(scene, camera).catch(() => {}), 0)
+    return () => window.clearTimeout(id)
+  }, [ready, gl, scene, camera])
+  return null
+}
+
 function Scene({ shuttleOn, activeLine }: CampusMapProps) {
   const controls = useRef<OrbitControlsImpl>(null)
   const stage = useStage(4)
   const modelsDue = stage >= 4
   const models = useMemo(() => (modelsDue ? buildLandmarkModels() : null), [modelsDue])
   const heights = useMemo(() => (models ? pinHeights(landmarks, models.tops) : null), [models])
+  const flags = usePerfFlags()
 
   return (
     <>
+      <PerfProbe />
+      <AdaptiveResolution />
       <color attach="background" args={[palette.sky]} />
       <hemisphereLight args={['#ffffff', '#d4ddd6', 1.73]} />
       <Sun controls={controls} />
       <BaseLayers />
       {stage >= 1 && <BuildingBlocks inside />}
       {stage >= 2 && <BuildingBlocks inside={false} />}
-      {stage >= 3 && <Trees shadows />}
+      {stage >= 3 && flags.trees && <Trees shadows />}
       {models && <LandmarkModels models={models} />}
-      {heights && <PinProjector landmarks={landmarks} heights={heights} />}
+      {heights && flags.pins && <PinProjector landmarks={landmarks} heights={heights} />}
       {shuttleOn && <ShuttleLayer activeLine={activeLine} />}
-      {shuttleOn && <StopProjector />}
+      {shuttleOn && flags.stops && <StopProjector />}
       <OrbitControls
         ref={controls}
         makeDefault
@@ -243,6 +278,7 @@ function Scene({ shuttleOn, activeLine }: CampusMapProps) {
         mouseButtons={{ LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }}
       />
       <CameraRig controls={controls} />
+      <Precompile ready={!!heights} />
     </>
   )
 }
@@ -267,7 +303,7 @@ export function CampusMap({ gestureTarget, onTap, ...props }: CampusMapProps) {
     <Canvas
       shadows={{ type: THREE.PCFShadowMap }}
       frameloop="demand"
-      dpr={[1, isCoarse ? 1.5 : 2]}
+      dpr={resolution.dpr}
       camera={{ fov: VFOV, near: 4, far: 20000, position: [0, 2000, 2000] }}
       gl={{ antialias: true, powerPreference: 'high-performance', toneMapping: THREE.NoToneMapping }}
     >

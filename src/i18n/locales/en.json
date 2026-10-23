@@ -98,5 +98,24 @@
     "app": "Live bus positions: the KU Talai app (Google Play / App Store).",
     "approxPosition": "Stop position read from the official map, so it’s approximate.",
     "notOfficial": "This stop is in OpenStreetMap but not on KU’s official route map."
+  },
+  "debug": {
+    "title": "Performance",
+    "fps": "FPS",
+    "frame": "Frame",
+    "cpu": "CPU",
+    "dpr": "DPR",
+    "calls": "Draw calls",
+    "triangles": "Triangles",
+    "moving": "Moving",
+    "idle": "Idle",
+    "shadows": "Shadows",
+    "blur": "Blur",
+    "pins": "Pins",
+    "stops": "Stops",
+    "trees": "Trees",
+    "hint": "Tap a toggle to turn that layer off, then pan and pinch.",
+    "maxDpr": "Max DPR {{value}}",
+    "auto": "auto"
   }
 }
