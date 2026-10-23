@@ -38,9 +38,13 @@ function centerRibbon(lines: [number, number][][], halfWidth: number): THREE.Buf
       const nl = Math.hypot(nx, ny) || 1
       nx /= nl; ny /= nl
       const m = halfWidth / Math.max(nx * -ay + ny * ax, 0.5)
+      // Square caps: push the end vertices out along the line by half a width,
+      // so separate polylines meet without gaps once widened in the shader.
+      const cap = i === 0 ? -halfWidth : i === pts.length - 1 ? halfWidth : 0
+      const dx = i === 0 ? bx : ax, dy = i === 0 ? by : ay
       for (const s of [1, -1]) {
         pos.push(cur[0], Y, -cur[1])
-        side.push(nx * m * s, ny * m * s)
+        side.push(nx * m * s + dx * cap, ny * m * s + dy * cap)
       }
       if (i > 0) {
         const a = start + (i - 1) * 2

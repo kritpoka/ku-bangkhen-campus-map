@@ -40,6 +40,8 @@ export function SearchResults({ id, results, query, suggested, activeIndex, onPi
       <ul id={id} role="listbox" aria-label={suggested ? t('search.suggested') : t('search.results')} className="pb-1">
         {results.map((r, i) => {
           const { color, icon: Icon } = categoryStyle[r.item.category]
+          // Stops: the stop's own name as the title; "Shuttle stop E12" underneath.
+          const title = r.item.kind === 'stop' && r.item.shortName ? r.item.shortName : r.item.name
           const active = i === activeIndex
           return (
             <li
@@ -57,11 +59,11 @@ export function SearchResults({ id, results, query, suggested, activeIndex, onPi
               </span>
               <span className="min-w-0 flex-1">
                 <span lang={lang} className="block text-[14px] leading-normal font-medium text-slate-900">
-                  {r.item.name[lang]}
+                  {title[lang]}
                 </span>
                 <span className="block truncate text-[12px] leading-normal text-slate-500">
-                  {r.item.kind === 'stop' ? t('search.stop') : t(`category.${r.item.category}`)}
-                  <span lang={other}> · {r.item.name[other]}</span>
+                  {r.item.kind === 'stop' ? `${t('search.stop')} ${r.item.badge ?? ''}` : t(`category.${r.item.category}`)}
+                  <span lang={other}> · {title[other]}</span>
                 </span>
               </span>
             </li>

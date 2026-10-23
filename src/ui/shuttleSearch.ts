@@ -11,6 +11,7 @@ registerSearchItems(
       category: 'transport' as const,
       name: { th: `ป้ายรถตะลัย ${s.name.th}`, en: `Shuttle stop: ${s.name.en}` },
       shortName: s.name,
+      badge: s.code,
       aliases: [s.code ?? '', `ป้าย${s.name.th}`, 'รถตะลัย', 'shuttle'].filter(Boolean),
     })),
 )

@@ -11,6 +11,7 @@ import { PinProjector } from './Pins'
 import { ShuttleLayer } from './ShuttleLayer'
 import { StopProjector } from './StopProjector'
 import { pinBridge } from './pinBridge'
+import { stopBridge } from './stopBridge'
 import { mapCamera } from './camera/mapCamera'
 import { Trees } from './Trees'
 import { palette } from './palette'
@@ -105,6 +106,7 @@ function CameraRig({ controls }: { controls: React.RefObject<OrbitControlsImpl |
       three: get,
       camera: mapCamera,
       pins: pinBridge,
+      stops: stopBridge,
       view(x: number, z: number, d: number, az = 0, polar = DEFAULT_POLAR) {
         mapCamera.write({ target: new THREE.Vector3(x, 0, z), distance: d, azimuth: az, polar })
         controls.current?.update()

@@ -11,6 +11,8 @@ export interface SearchItem {
   /** Category labels in both languages, matched weakly ("อาหาร", "food"). */
   categoryLabels?: string[]
   featured?: boolean
+  /** Short tag shown with the result (e.g. a shuttle stop code). */
+  badge?: string
 }
 
 export interface SearchResult {
