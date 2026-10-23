@@ -14,7 +14,8 @@
     "test:desktop": "node tests/e2e/desktop.mjs",
     "test:webkit": "node tests/e2e/webkit.mjs",
     "test:search": "node tests/e2e/search.mjs",
-    "test:shuttle": "node tests/e2e/shuttle.mjs"
+    "test:shuttle": "npm run test:shuttle-data && node tests/e2e/shuttle.mjs",
+    "test:shuttle-data": "tsx scripts/shuttle/validate-paths.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

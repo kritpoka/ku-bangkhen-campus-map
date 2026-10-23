@@ -61,6 +61,33 @@ function centerRibbon(lines: [number, number][][], halfWidth: number): THREE.Buf
   return g
 }
 
+/**
+ * Pieces of a continuous route to draw: each road stretch once (a loop can pass
+ * a road twice, e.g. both directions of a two-way road), split at U-turns so a
+ * ribbon never folds back on itself. Square caps close the joins.
+ */
+function drawRuns(route: [number, number][]): [number, number][][] {
+  const k = (p: [number, number]) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`
+  const seen = new Set<string>()
+  const runs: [number, number][][] = []
+  let run: [number, number][] = []
+  for (let i = 1; i < route.length; i++) {
+    const a = route[i - 1], b = route[i]
+    const edge = [k(a), k(b)].sort().join('|')
+    const repeat = seen.has(edge)
+    if (repeat || (i >= 2 && k(route[i - 2]) === k(b))) {
+      if (run.length > 1) runs.push(run)
+      run = []
+    }
+    if (repeat) continue
+    seen.add(edge)
+    if (run.length === 0) run.push(a)
+    run.push(b)
+  }
+  if (run.length > 1) runs.push(run)
+  return runs
+}
+
 const widthScale = { value: 1 }
 
 function lineMaterial(color: THREE.ColorRepresentation) {
@@ -93,7 +120,7 @@ export function ShuttleLayer({ activeLine }: { activeLine: string | null }) {
     const lines = shuttleLines.filter((l) => l.path.length > 0)
     lines.sort((a, b) => (WIDTH[b.id] ?? 4) - (WIDTH[a.id] ?? 4))
     return lines.map((l) => {
-      const proj = l.path.map((pl) => pl.map(([lng, lat]) => project(lng, lat)))
+      const proj = drawRuns(l.path.map(([lng, lat]) => project(lng, lat)))
       const w = WIDTH[l.id] ?? 4
       return {
         id: l.id,

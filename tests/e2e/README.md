@@ -9,7 +9,8 @@ npm run test:touch                # multi-touch gestures, Chrome mobile emulatio
 npm run test:desktop              # mouse + keyboard on desktop Chrome (9 checks)
 npm run test:webkit               # Safari engine: native taps + synthetic multi-touch (9 checks)
 npm run test:search               # search, filters, back-gesture history, sheet snaps (20 checks)
-npm run test:shuttle              # shuttle overlay: toggle, lines, stop tap, stop search (12 checks)
+npm run test:shuttle              # shuttle data validation, then overlay: toggle, lines, stops, chips (19 checks)
+npm run test:shuttle-data         # route data only: on campus, continuous, stops near their line
 ```
 
 Requirements: Google Chrome installed (tests use `channel: 'chrome'`), and for

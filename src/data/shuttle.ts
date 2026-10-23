@@ -8,8 +8,10 @@
  * - Service schedule poster uploaded 2026/08:
  *   …/wp-content/uploads/2026/08/Busway_010726.png
  *
- * Paths (shuttle-paths.json) were traced from the route maps onto OSM roads by
- * scripts/shuttle/trace_routes.py. Stop order is read from the route maps.
+ * Paths (shuttle-paths.json) were traced from the route maps onto campus roads
+ * in OSM by scripts/shuttle/trace_routes.py, which routes each line through its
+ * stops in the order below; `npm run test:shuttle-data` validates the result.
+ * Stop order is read from the route maps.
  * Stop positions: OSM bus-stop nodes where one matches the official stop,
  * otherwise read from the georeferenced official map (approximate).
  *
@@ -34,8 +36,11 @@ export interface ShuttleLine {
   summary: Localized
   /** Ordered stop ids (a loop returns to the first stop). */
   stops: string[]
-  /** Traced path polylines [lng, lat][]; empty when KU publishes no route map. */
-  path: [number, number][][]
+  /**
+   * Traced route [lng, lat][]: one continuous loop through the stops in order
+   * (on-map stops only), on campus roads. Empty when KU publishes no route map.
+   */
+  path: [number, number][]
   service: { weekdays?: ShuttleService; saturday?: ShuttleService; sunday?: ShuttleService }
   notes?: Localized
 }
@@ -56,7 +61,7 @@ export interface ShuttleStop {
 
 const WEEKDAY_HOURS: Localized = { th: '06:30–18:30 และ 18:30–21:30 น.', en: '06:30–18:30 and 18:30–21:30' }
 const WEEKEND_HOURS: Localized = { th: '07:00–17:00 น.', en: '07:00–17:00' }
-const line = (id: string) => (paths.lines as unknown as Record<string, [number, number][][]>)[id] ?? []
+const line = (id: string) => (paths.lines as unknown as Record<string, [number, number][]>)[id] ?? []
 
 export const shuttleLines: ShuttleLine[] = [
   {
@@ -106,8 +111,8 @@ export const shuttleLines: ShuttleLine[] = [
       sunday: { buses: 2, hours: WEEKEND_HOURS },
     },
     notes: {
-      th: 'ช่วงหอพักนิสิตอยู่นอกขอบเขตแผนที่นี้ และช่วงสุดท้ายไปป้าย E8–E9 ไม่ได้ลากเส้นไว้',
-      en: 'The dormitory section is outside this map, and the last stretch to stops E8–E9 is not traced.',
+      th: 'ช่วงหอพักนิสิต (ป้าย E19–E25) อยู่นอกขอบเขตแผนที่นี้ จึงไม่ได้แสดงเส้นทางช่วงนั้น',
+      en: 'The dormitory section (stops E19–E25) is outside this map, so that part of the route is not drawn.',
     },
   },
   {
@@ -146,8 +151,8 @@ const stops: ShuttleStop[] = [
   { code: 'E5', id: 'e5', osmId: 'node/891276472', coordinates: { lat: 13.842786, lng: 100.571926 }, coordSource: 'osm', name: { th: 'อาคารวิทยพัฒนา', en: 'Witthayaphatthana Building' } },
   { code: 'E6', id: 'e6', osmId: 'node/3204379765', coordinates: { lat: 13.844598, lng: 100.572632 }, coordSource: 'osm', name: { th: 'ตรงข้ามอาคาร SCL', en: 'Opposite SCL Building' } },
   { code: 'E7', id: 'e7', coordinates: { lat: 13.846116, lng: 100.573722 }, coordSource: 'official-map', name: { th: 'ใกล้คณะวนศาสตร์', en: 'Near Faculty of Forestry' }, notes: 'Position from the georeferenced official map (approximate).' },
-  { code: 'E8', id: 'e8', coordinates: { lat: 13.84544, lng: 100.576485 }, coordSource: 'official-map', name: { th: 'ใกล้คณะเทคนิคการสัตวแพทย์', en: 'Near Faculty of Veterinary Technology' }, notes: 'Position read from the official map; not on a traced road (approximate).' },
-  { code: 'E9', id: 'e9', coordinates: { lat: 13.844766, lng: 100.576564 }, coordSource: 'official-map', name: { th: 'ใกล้คณะเทคนิคการสัตวแพทย์', en: 'Near Faculty of Veterinary Technology' }, notes: 'Position read from the official map; not on a traced road (approximate).' },
+  { code: 'E8', id: 'e8', coordinates: { lat: 13.845342, lng: 100.576162 }, coordSource: 'official-map', name: { th: 'ใกล้คณะเทคนิคการสัตวแพทย์', en: 'Near Faculty of Veterinary Technology' }, notes: 'Approximate. The official-map reading (13.84544, 100.576485) was 37 m off the road, among buildings; moved to the nearest point on the traced line 5 spur (way/589599723), which the map draws E8 beside.' },
+  { code: 'E9', id: 'e9', coordinates: { lat: 13.844766, lng: 100.576564 }, coordSource: 'official-map', name: { th: 'ใกล้คณะเทคนิคการสัตวแพทย์', en: 'Near Faculty of Veterinary Technology' }, notes: 'Position read from the official map (approximate); about 18 m east of the traced line 5 spur.' },
   { code: 'E10', id: 'e10', coordinates: { lat: 13.84654, lng: 100.572502 }, coordSource: 'official-map', name: { th: 'ใกล้สถาบันวิจัยและพัฒนาแห่ง มก.', en: 'Near KU Research and Development Institute' }, notes: 'Position from the georeferenced official map (approximate).' },
   { code: 'E11', id: 'e11', coordinates: { lat: 13.847451, lng: 100.572503 }, coordSource: 'official-map', name: { th: 'ใกล้สำนักหอสมุด', en: 'Near KU Library' }, notes: 'Position from the georeferenced official map (approximate).' },
   { code: 'E12', id: 'e12', osmId: 'node/891278241', coordinates: { lat: 13.847771, lng: 100.57251 }, coordSource: 'osm', name: { th: 'สำนักหอสมุด', en: 'KU Library' } },

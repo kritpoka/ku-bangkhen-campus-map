@@ -11,24 +11,33 @@ service schedule):
   https://vehicle.ku.ac.th/index.html/wp-content/uploads/2022/06/bus1.jpeg  (line 1)
   https://vehicle.ku.ac.th/index.html/wp-content/uploads/2022/06/bus3.jpeg  (line 3)
   https://vehicle.ku.ac.th/index.html/wp-content/uploads/2022/06/bus5.jpeg  (line 5)
+  https://vehicle.ku.ac.th/index.html/wp-content/uploads/2022/06/bus_way.jpeg (overview, stop codes)
 
 Method
 1. Georeference each map: an affine transform from pixels to local meters,
    initialised from the four gate markers + the Hexagonal Pavilion stop and
-   refined by ICP (navy route pixels -> nearest OSM road).
-2. A road segment belongs to a line when the route ink covers most of it.
-3. Stop dots are detected as round black blobs, georeferenced, and matched to
-   the stop codes read from the map (STOP_CODES) and to OSM bus stops.
+   refined by ICP (navy route pixels -> nearest OSM road), then a smooth
+   non-rigid correction for the illustration's local distortion.
+2. Road graph: drivable OSM roads inside the campus area only (the OSM campus
+   polygons + AREA_TOL), plus the reviewed KU roads in outside-roads.json that
+   OSM's campus polygon leaves out. Public roads (primary/secondary/trunk/…,
+   and anything named Ngamwongwan / Phahonyothin / Vibhavadi) are never used.
+3. Each road is weighted by how well that line's ink covers it, so off-route
+   roads cost several times their length.
+4. The route is the cheapest path through the line's stops in order (from
+   src/data/shuttle.ts) and back to the first stop: one continuous polyline
+   per line, with U-turns penalised.
 
 Usage:
   mkdir -p .cache/shuttle && cd .cache/shuttle
-  curl -O <each image URL above>  (plus .../2022/06/bus_way.jpeg, the overview)
-  python3 scripts/shuttle/trace_routes.py .cache/shuttle src/data/shuttle-paths.json [--debug out.png] [--chains]
+  curl -O <each image URL above>
+  python3 scripts/shuttle/trace_routes.py .cache/shuttle src/data/shuttle-paths.json [--debug out-dir]
+  npm run test:shuttle-data        # validates the result
 
-Review the --debug render against the official maps before committing; fix
-anything wrong with the EXCLUDE list below.
+Review the --debug renders (route drawn back onto each official map) before
+committing.
 """
-import json, math, sys
+import heapq, json, math, re, sys
 from pathlib import Path
 import numpy as np
 from PIL import Image
@@ -179,289 +188,215 @@ def nonrigid(W, tree, road_xy, iters=4, sigma=60.0, max_res=25.0):
         W = W + field[sub][near]
     return W
 
-# Manual corrections after visual review against the official maps (see the
-# debug render written next to the output). Each entry: OSM way id -> reason.
-EXCLUDE = {
-    'bus1': {
-        'way/176059323': 'small loop beside the library road picked up by tolerance',
-    },
-    'bus5': {
-        'way/707597769': 'parking aisle west of the trunk; official western stroke has no OSM road',
-        'way/866917279': 'driveway stub west of the trunk',
-        'way/866917280': 'service stub west of the trunk',
-        'way/176059323': 'small loop west of the trunk',
-        'way/176059332': 'small loop west of the trunk',
-        'way/693628966': 'stub north-west of the trunk',
-        'way/707593960': 'stub north-west of the trunk',
-        'way/94054900': 'roundabout detour west of E10; official line stays on the trunk',
-        'way/94054891': 'roundabout detour west of E10',
-        'way/259496891': 'diagonal to the roundabout west of E10',
-        'way/93917368': 'line 1 road (ถนนจักรพันธ์) reached only via the excluded stubs',
-        'way/589732942': 'driveway loop off the dormitory road',
-        'way/589732943': 'driveway loop off the dormitory road',
-        'way/383695643': 'hook near Vet Tech that does not match the official E8-E9 branch',
-        'way/383695656': 'hook near Vet Tech that does not match the official E8-E9 branch',
-    },
-}
 
-# Reviewed additions: force the shortest road path between two points into a
-# line, where the official map clearly shows the line but tracing missed it
-# (usually because another line is drawn on top of it on the map).
-FORCE_LINKS = {
-    'bus1': [
-        # East trunk from Agriculture (E14) south past the Library (E12) to E10.
-        ((100.572477, 13.850117), (100.572502, 13.846540)),
-    ],
-}
+# ─── Campus area ────────────────────────────────────────────────────────────
 
-def force_link(segs, graph, idx, a_lnglat, b_lnglat):
-    import heapq
-    nodes = list(graph)
-    arr = np.array(nodes)
-    def nearest(lnglat):
-        p = np.array(proj(*lnglat))
-        return nodes[int(np.argmin(((arr - p) ** 2).sum(1)))]
-    start, goal = nearest(a_lnglat), nearest(b_lnglat)
-    dist, prev, pq = {start: 0.0}, {}, [(0.0, start)]
-    while pq:
-        d, u = heapq.heappop(pq)
-        if u == goal:
-            break
-        if d > dist.get(u, 1e18):
-            continue
-        for v, si, L in graph.get(u, []):
-            if d + L < dist.get(v, 1e18):
-                dist[v], prev[v] = d + L, (u, si)
-                heapq.heappush(pq, (d + L, v))
-    out = set(idx)
-    u = goal
-    while u != start and u in prev:
-        u, si = prev[u]
-        out.add(si)
-    return sorted(out)
+AREA_TOL = 10.0  # m: roads this close to the OSM campus polygons count as inside (edge roads, mapping slop)
+PUBLIC_HIGHWAY = {'motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link',
+                  'secondary', 'secondary_link', 'tertiary', 'tertiary_link'}
+PUBLIC_NAMES = ('งามวงศ์วาน', 'พหลโยธิน', 'วิภาวดี', 'Ngam Wong Wan', 'Phahon Yothin', 'Vibhavadi')
+DISCOVER = '--discover' in sys.argv  # review aid: also allow every non-public road outside the area
+OUTSIDE_ROADS = json.loads((Path(__file__).parent / 'outside-roads.json').read_text())['ways']
 
-COVER_TOL = 14.0  # m: route ink this close counts as covering the road (parallel lines are drawn ~9 m apart)
-COVER_MIN = 0.6  # fraction of a segment that must be covered
+def campus_edges():
+    """Edges (N x 4: ax, ay, bx, by in meters) of every ring of the campus MultiPolygon."""
+    g = json.loads((OSM / 'boundary.json').read_text())['geometry']
+    polys = g['coordinates'] if g['type'] == 'MultiPolygon' else [g['coordinates']]
+    E = []
+    for poly in polys:
+        for ring in poly:
+            P = [proj(*c) for c in ring]
+            E += [(*P[i], *P[i + 1]) for i in range(len(P) - 1)]
+    return np.array(E)
 
-def members(segs, ink_world):
-    """Indices of road segments the route ink covers."""
-    tree = cKDTree(ink_world)
-    out = []
-    for i, sg in enumerate(segs):
-        (ax, ay), (bx, by) = sg['a'], sg['b']
-        L = math.hypot(bx - ax, by - ay)
-        n = max(2, int(L / 2.5))
-        t = np.linspace(0, 1, n)
-        P = np.stack([ax + (bx - ax) * t, ay + (by - ay) * t], 1)
-        d, _ = tree.query(P)
-        if (d < COVER_TOL).mean() >= COVER_MIN:
-            out.append(i)
-    return out
+EDGES = None
 
-GAP_MAX = 160.0  # m: bridge loose ends this far apart along the road network
-SPUR_MAX = 80.0  # m: dead-end branches shorter than this are tolerance artefacts (routes are loops; real termini are long)
+def area_distance(P):
+    """Distance (m) from each point to the campus area: 0 inside, else to the nearest edge."""
+    global EDGES
+    if EDGES is None:
+        EDGES = campus_edges()
+    P = np.atleast_2d(np.asarray(P, float))
+    ax, ay, bx, by = (EDGES[:, i][None, :] for i in range(4))
+    px, py = P[:, 0:1], P[:, 1:2]
+    dx, dy = bx - ax, by - ay
+    t = np.clip(((px - ax) * dx + (py - ay) * dy) / np.maximum(dx * dx + dy * dy, 1e-9), 0, 1)
+    d = np.hypot(ax + t * dx - px, ay + t * dy - py).min(1)
+    # Even-odd ray cast across all rings (outer rings and holes alike).
+    cross = ((ay > py) != (by > py)) & (px < ax + (py - ay) * dx / np.where(dy == 0, 1e-9, dy))
+    inside = cross.sum(1) % 2 == 1
+    return np.where(inside, 0.0, d)
+
+def is_public(props):
+    name = (props.get('name') or '') + ' ' + (props.get('name:en') or '')
+    return props.get('highway') in PUBLIC_HIGHWAY or any(n in name for n in PUBLIC_NAMES)
+
+# ─── Road graph ─────────────────────────────────────────────────────────────
 
 def key(p):
     return (round(p[0], 2), round(p[1], 2))
 
-def road_graph(segs):
-    g = {}
+def drivable_segments():
+    """Every drivable OSM road segment, with an `allowed` flag (campus area, not public)."""
+    roads = json.loads((OSM / 'roads.json').read_text())['features']
+    segs = []
+    for f in roads:
+        pr = f['properties']
+        if pr['class'] == 'path':
+            continue
+        g = f['geometry']
+        for coords in ([g['coordinates']] if g['type'] == 'LineString' else g['coordinates']):
+            P = [proj(*c) for c in coords]
+            for a, b in zip(P, P[1:]):
+                if math.dist(a, b) > 0.01:
+                    segs.append({'a': a, 'b': b, 'way': pr['id'], 'props': pr})
+    mids = np.array([[(s['a'][0] + s['b'][0]) / 2, (s['a'][1] + s['b'][1]) / 2] for s in segs])
+    da = area_distance([s['a'] for s in segs])
+    db = area_distance([s['b'] for s in segs])
+    dm = area_distance(mids)
+    for s, x, y, z in zip(segs, da, db, dm):
+        s['outside'] = max(x, y, z) > AREA_TOL
+        s['allowed'] = not is_public(s['props']) and (not s['outside'] or s['way'] in OUTSIDE_ROADS or DISCOVER)
+    return segs
+
+def coverage(segs, ink_tree):
+    """Per segment: mean ink credit (1 within 6 m of the line's ink, 0 beyond 16 m)."""
+    out = np.zeros(len(segs))
     for i, sg in enumerate(segs):
-        a, b = key(sg['a']), key(sg['b'])
-        L = math.dist(sg['a'], sg['b'])
-        g.setdefault(a, []).append((b, i, L))
-        g.setdefault(b, []).append((a, i, L))
-    return g
-
-def degree(idx_set, segs):
-    deg = {}
-    for i in idx_set:
-        for e in ('a', 'b'):
-            k = key(segs[i][e])
-            deg[k] = deg.get(k, 0) + 1
-    return deg
-
-def fill_gaps(segs, idx, graph):
-    """Connect dangling ends of the traced network via shortest road paths."""
-    import heapq
-    member = set(idx)
-    for _ in range(3):
-        deg = degree(member, segs)
-        ends = [k for k, d in deg.items() if d == 1]
-        nodes = set(deg)
-        added = False
-        for start in ends:
-            dist, prev = {start: 0.0}, {}
-            pq = [(0.0, start)]
-            hit = None
-            while pq:
-                d, u = heapq.heappop(pq)
-                if d > GAP_MAX:
-                    break
-                if u != start and u in nodes and d > 0:
-                    hit = u
-                    break
-                for v, si, L in graph.get(u, []):
-                    if si in member and u == start:
-                        continue  # don't walk back along the line itself
-                    nd = d + L
-                    if nd < dist.get(v, 1e18):
-                        dist[v], prev[v] = nd, (u, si)
-                        heapq.heappush(pq, (nd, v))
-            if hit:
-                u = hit
-                while u != start:
-                    pu, si = prev[u]
-                    if si not in member:
-                        member.add(si)
-                        added = True
-                    u = pu
-        if not added:
-            break
-    return sorted(member)
-
-def prune_spurs(segs, idx):
-    """Iteratively remove dead-end branches shorter than SPUR_MAX."""
-    member = set(idx)
-    while True:
-        deg = degree(member, segs)
-        adj = {}
-        for i in member:
-            for e in ('a', 'b'):
-                adj.setdefault(key(segs[i][e]), []).append(i)
-        removed = False
-        for k, d in deg.items():
-            if d != 1:
-                continue
-            # Walk from the dead end to the first junction.
-            path, cur, length = [], k, 0.0
-            seg = adj[cur][0]
-            while True:
-                path.append(seg)
-                a, b = key(segs[seg]['a']), key(segs[seg]['b'])
-                length += math.dist(segs[seg]['a'], segs[seg]['b'])
-                cur = b if a == cur else a
-                nxt = [j for j in adj[cur] if j not in path]
-                if deg.get(cur, 0) != 2 or not nxt:
-                    break
-                seg = nxt[0]
-            if length < SPUR_MAX and deg.get(cur, 0) >= 3:
-                member -= set(path)
-                removed = True
-                break
-        if not removed:
-            return sorted(member)
-
-STRICT_TOL = 6.0  # m
-STRICT_MIN = 0.45
-
-def strict_cover(segs, chain_segs, ink_tree):
-    pts = []
-    for i in chain_segs:
-        (ax, ay), (bx, by) = segs[i]['a'], segs[i]['b']
-        n = max(2, int(math.hypot(bx - ax, by - ay) / 2.0))
+        (ax, ay), (bx, by) = sg['a'], sg['b']
+        n = max(2, int(math.hypot(bx - ax, by - ay) / 2.0) + 1)
         t = np.linspace(0, 1, n)
-        pts.append(np.stack([ax + (bx - ax) * t, ay + (by - ay) * t], 1))
-    d, _ = ink_tree.query(np.vstack(pts))
-    return (d < STRICT_TOL).mean()
-
-def junction_chains(segs, member):
-    """Split the member network into chains between junctions / dead ends."""
-    deg = degree(member, segs)
-    adj = {}
-    for i in member:
-        for e in ('a', 'b'):
-            adj.setdefault(key(segs[i][e]), []).append(i)
-    seen, out = set(), []
-    for i in member:
-        if i in seen:
-            continue
-        # Extend both ways from segment i through degree-2 nodes.
-        chain = [i]
-        seen.add(i)
-        ends = []
-        for e in ('a', 'b'):
-            cur, seg = key(segs[i][e]), i
-            while deg.get(cur, 0) == 2:
-                nxt = [j for j in adj[cur] if j != seg]
-                if not nxt or nxt[0] in seen:
-                    break
-                seg = nxt[0]
-                seen.add(seg)
-                chain.append(seg)
-                a, b = key(segs[seg]['a']), key(segs[seg]['b'])
-                cur = b if a == cur else a
-            ends.append(cur)
-        out.append((chain, ends[0], ends[1]))
+        d, _ = ink_tree.query(np.stack([ax + (bx - ax) * t, ay + (by - ay) * t], 1))
+        out[i] = np.clip((16.0 - d) / 10.0, 0, 1).mean()
     return out
 
-def connected_without(member, segs, removed, u, v):
-    g = {}
-    for i in member - removed:
-        a, b = key(segs[i]['a']), key(segs[i]['b'])
-        g.setdefault(a, []).append(b)
-        g.setdefault(b, []).append(a)
-    stack, seen = [u], {u}
-    while stack:
-        x = stack.pop()
-        if x == v:
-            return True
-        for y in g.get(x, []):
-            if y not in seen:
-                seen.add(y)
-                stack.append(y)
-    return False
+OFF_INK = 8.0     # an uncovered road costs (1 + OFF_INK) x its length
+UTURN = 250.0     # m-equivalent penalty for turning back on the same road
+WRONG_WAY = 4.0   # cost factor for driving against a one-way road
+SNAP_MAX = 40.0   # m: a stop must be this close to an allowed road
 
-def drop_side_loops(segs, idx, ink_tree):
-    """Remove poorly covered chains whose removal keeps the network connected
-    (driveway loops and building ring roads next to the route)."""
-    member = set(idx)
-    while True:
-        worst = None
-        for chain, u, v in junction_chains(segs, member):
-            c = strict_cover(segs, chain, ink_tree)
-            length = sum(math.dist(segs[i]['a'], segs[i]['b']) for i in chain)
-            # Short rungs (parking-bay connectors) count as poorly covered.
-            if length < 30.0:
-                c = min(c, STRICT_MIN - 0.01)
-            if c < STRICT_MIN and (worst is None or c < worst[0]):
-                if u == v or connected_without(member, segs, set(chain), u, v):
-                    worst = (c, chain)
-        if not worst:
-            return sorted(member)
-        member -= set(worst[1])
+# Reviewed: stops whose road can't be told from position alone. line -> stop -> OSM way.
+STOP_ROADS = {
+    '5': {
+        # The official line 5 map turns south off the E7 road into a short spur with E8 and E9
+        # on its east side; that spur is this road along the west edge of the Vet Tech parcel.
+        'e8': 'way/589599723',
+        'e9': 'way/589599723',
+    },
+}
 
-def chains(segs, idx):
-    """Merge member segments into polylines through shared endpoints."""
-    key = lambda p: (round(p[0], 2), round(p[1], 2))
-    adj = {}
-    for i in idx:
-        for end in ('a', 'b'):
-            adj.setdefault(key(segs[i][end]), []).append(i)
-    used, out = set(), []
-    def walk(start_seg, start_pt):
-        line, seg, pt = [start_pt], start_seg, start_pt
-        while True:
-            used.add(seg)
-            a, b = segs[seg]['a'], segs[seg]['b']
-            nxt = b if key(a) == key(pt) else a
-            line.append(nxt)
-            cand = [j for j in adj[key(nxt)] if j not in used]
-            if len(adj[key(nxt)]) != 2 or not cand:
-                return line
-            seg, pt = cand[0], nxt
-    # Start from endpoints / junctions first, then any leftover loops.
-    for i in idx:
-        if i in used:
-            continue
-        for end in ('a', 'b'):
-            if len(adj[key(segs[i][end])]) != 2 and i not in used:
-                out.append(walk(i, segs[i][end]))
-    for i in idx:
-        if i not in used:
-            out.append(walk(i, segs[i]['a']))
+def snap_stops(segs, cov, stops, pinned=None):
+    """Candidate attachment points for each stop: the nearest point on each nearby allowed
+    road (one per OSM way). A stop between the two carriageways of a divided road gets
+    both, and the route uses whichever its direction of travel allows."""
+    out = {}
+    for sid, p in stops.items():
+        best = {}
+        for i, sg in enumerate(segs):
+            if not sg['allowed'] or (pinned and sid in pinned and sg['way'] != pinned[sid]):
+                continue
+            (ax, ay), (bx, by) = sg['a'], sg['b']
+            dx, dy = bx - ax, by - ay
+            t = min(1, max(0, ((p[0] - ax) * dx + (p[1] - ay) * dy) / (dx * dx + dy * dy)))
+            q = (ax + t * dx, ay + t * dy)
+            d = math.dist(p, q)
+            if d > SNAP_MAX:
+                continue
+            if sg['way'] not in best or d < best[sg['way']]['dist']:
+                best[sg['way']] = {'seg': i, 't': t, 'at': q, 'dist': d}
+        if not best:
+            raise SystemExit(f'stop {sid} is more than {SNAP_MAX} m from any allowed road')
+        # Every road within 20 m of the nearest one; the route picks (see build_graph goals).
+        top = min(c['dist'] for c in best.values())
+        out[sid] = [c for c in sorted(best.values(), key=lambda c: c['dist']) if c['dist'] <= top + 20.0]
     return out
 
+def oneway(props):
+    return {'yes': 1, 'true': 1, '1': 1, '-1': -1}.get(str(props.get('oneway')), 0)
+
+def build_graph(segs, cov, snaps):
+    """Directed adjacency over allowed segments (one-way roads only forwards); segments
+    holding stop candidates are split at them. Returns coords, adjacency, stop goals."""
+    splits, goals = {}, {}
+    for sid, cands in snaps.items():
+        for k, c in enumerate(cands):
+            node = ('stop', sid, k)
+            splits.setdefault(c['seg'], []).append((c['t'], node, c['at']))
+            goals.setdefault(sid, {})[node] = 2.0 * c['dist']  # prefer the nearer carriageway
+    coord, adj = {}, {}
+    for i, sg in enumerate(segs):
+        if not sg['allowed']:
+            continue
+        ow = oneway(sg['props'])
+        pts = [(0.0, key(sg['a']), sg['a'])] + sorted(splits.get(i, [])) + [(1.0, key(sg['b']), sg['b'])]
+        for (_, u, pu), (_, v, pv) in zip(pts, pts[1:]):
+            coord[u], coord[v] = pu, pv
+            L = math.dist(pu, pv)
+            c = L * (1 + OFF_INK * (1 - cov[i]))
+            # Against a one-way road: allowed but expensive (OSM may map only one carriageway).
+            adj.setdefault(u, []).append((v, c if ow >= 0 else c * WRONG_WAY + 60, i))
+            adj.setdefault(v, []).append((u, c if ow <= 0 else c * WRONG_WAY + 60, i))
+    return coord, adj, goals
+
+def trace_line(order, coord, adj, goals):
+    """One continuous loop through the stops in order and back to the first stop.
+
+    A single Dijkstra over (node, previous node, stops visited) states, so the choice of
+    carriageway or lay-by at one stop accounts for what it costs to carry on (U-turns
+    included). Tried from each candidate of the first stop; the loop closes there."""
+    targets = order[1:]
+    best_loop = None
+    for first, extra in goals[order[0]].items():
+        n = len(targets)
+        start = (first, None, 0)
+        pq = [(extra, start)]
+        best = {start: extra}
+        back = {}
+        end = None
+        while pq:
+            d, st = heapq.heappop(pq)
+            if d > best.get(st, 1e18):
+                continue
+            u, pu, k = st
+            if k == n and u == first and pu is not None:
+                end = (d, st)
+                break
+            if k < n and u in goals[targets[k]]:
+                nxt = (u, pu, k + 1)
+                nd = d + goals[targets[k]][u]
+                if nd < best.get(nxt, 1e18):
+                    best[nxt], back[nxt] = nd, st
+                    heapq.heappush(pq, (nd, nxt))
+            for v, c, _ in adj.get(u, []):
+                nd = d + c + (UTURN if v == pu else 0.0)
+                nxt = (v, u, k)
+                if nd < best.get(nxt, 1e18):
+                    best[nxt], back[nxt] = nd, st
+                    heapq.heappush(pq, (nd, nxt))
+        if end and (best_loop is None or end[0] < best_loop[0]):
+            st, nodes = end[1], []
+            while st in back:
+                if not nodes or nodes[-1] != st[0]:
+                    nodes.append(st[0])
+                st = back[st]
+            nodes.append(st[0])
+            best_loop = (end[0], nodes[::-1])
+    if best_loop is None:
+        raise SystemExit(f'no allowed road loop through stops {order}')
+    return best_loop[1], best_loop[0]
+
+# ─── Stop data from src/data/shuttle.ts ─────────────────────────────────────
+
+def read_shuttle_ts():
+    """Stop positions and each line's stop order. Off-map stops (outside the campus area,
+    e.g. line 5's dormitory section) are not routed: the drawn route covers the campus."""
+    s = (ROOT / 'src' / 'data' / 'shuttle.ts').read_text()
+    rows = re.findall(r"\{ (?:code: '[\w]+', )?id: '([\w-]+)',[^\n]*?coordinates: \{ lat: ([\d.]+), lng: ([\d.]+) \}([^\n]*)", s)
+    stops = {sid: proj(float(lng), float(lat)) for sid, lat, lng, rest in rows if 'offMap: true' not in rest}
+    lines = {m.group(1): re.findall(r"'([\w-]+)'", m.group(2))
+             for m in re.finditer(r"\n    id: '(\w+)',[\s\S]*?stops: \[([^\]]*)\]", s)}
+    lines = {k: [sid for sid in v if sid in stops] for k, v in lines.items()}
+    return stops, {k: v for k, v in lines.items() if v}
 # Stop codes and their dot positions on the overview map (bus_way.jpeg),
 # in original-image pixels, read off the map. E1 appears twice on the map
 # (Hexagonal Pavilion by the BTS, and the Amornphan sub-gate by the
@@ -505,86 +440,147 @@ def locate_stops(path, tree, road_xy):
     world = apply(T, [STOP_CODES_PX[c] for c in codes])
     return {c: (float(x), float(y)) for c, (x, y) in zip(codes, world)}
 
-def write_output(out, results, stops):
-    lines = {}
-    for name, r in results.items():
-        lines[name.replace('bus', '')] = [
-            [[round(v, 6) for v in unproj(*p)] for p in line] for line in r['lines']
-        ]
+
+# ─── Output and review renders ──────────────────────────────────────────────
+
+def write_output(out, routes, stop_codes):
     data = {
-        'note': 'Generated by scripts/shuttle/trace_routes.py from KU official route maps (dated 1 Mar 2022). Do not edit by hand.',
-        'lines': lines,
-        'stopCodes': {c: [round(v, 6) for v in unproj(*p)] for c, p in stops.items()},
+        'note': 'Generated by scripts/shuttle/trace_routes.py from KU official route maps (dated 1 Mar 2022). '
+                'Each line is one continuous loop through its stops in order. Do not edit by hand.',
+        'lines': {name.replace('bus', ''): [[round(v, 6) for v in unproj(*p)] for p in pts] for name, pts in routes.items()},
+        'stopCodes': {c: [round(v, 6) for v in unproj(*p)] for c, p in stop_codes.items()},
     }
     out.write_text(json.dumps(data, ensure_ascii=False) + '\n')
     print('wrote', out)
 
-def debug_render(segs, results, out, stops=None):
-    """Overlay traced lines (and raw georeferenced ink) on OSM roads, for review."""
+def world_to_map(r):
+    """Inverse of a line map's georeferencing (world m -> image px), for drawing routes back
+    onto the official map: a quadratic fit plus the local residual of nearby ink."""
+    W, X = r['ink_world'][::5], r['ink_px'][::5]
+    T = fit_affine(W, X, 2)
+    res = X - apply(T, W)
+    tree = cKDTree(W)
+    def f(P):
+        P = np.asarray(P, float)
+        out = apply(T, P)
+        for j, p in enumerate(P):
+            nb = tree.query_ball_point(p, 40.0)
+            if nb:
+                w = np.exp(-np.sum((W[nb] - p) ** 2, 1) / (2 * 15.0 ** 2))
+                out[j] += (res[nb] * w[:, None]).sum(0) / max(w.sum(), 1e-9)
+        return out
+    return f
+
+def debug_on_official(r, pts, stops, out):
+    """The traced route (yellow, with a dark casing) and its stops drawn on the official map."""
     from PIL import ImageDraw
-    W, H, s = 1400, 1400, 0.62  # px per m
-    cx, cy = 50, 100
+    img = Image.fromarray(r['image'].astype(np.uint8))
+    dr = ImageDraw.Draw(img)
+    f = world_to_map(r)
+    px = [tuple(q) for q in f(pts)]
+    dr.line(px, fill=(20, 20, 20), width=13, joint='curve')
+    dr.line(px, fill=(255, 210, 0), width=7, joint='curve')
+    for sid, p in stops.items():
+        x, y = f([p])[0]
+        dr.ellipse([x - 9, y - 9, x + 9, y + 9], outline=(220, 0, 120), width=4)
+    img.resize((img.width // 2, img.height // 2), Image.LANCZOS).save(out, quality=85)
+    img.save(out.with_name(out.stem + '-full.jpg'), quality=88)
+
+def debug_osm(segs, routes, stops, out):
+    """Top-down OSM render: allowed roads, excluded roads, campus edge, routes and stops."""
+    from PIL import ImageDraw
+    W, H, s = 1500, 1500, 0.6  # px per m
+    cx, cy = 150, 50
     img = Image.new('RGB', (W, H), 'white')
     dr = ImageDraw.Draw(img)
     tp = lambda p: (W / 2 + (p[0] - cx) * s, H / 2 - (p[1] - cy) * s)
+    for e in EDGES:
+        dr.line([tp(e[:2]), tp(e[2:])], fill=(60, 160, 60), width=2)
     for sg in segs:
-        dr.line([tp(sg['a']), tp(sg['b'])], fill=(205, 205, 205), width=2)
+        col = (200, 200, 200) if sg['allowed'] else (240, 170, 170)
+        dr.line([tp(sg['a']), tp(sg['b'])], fill=col, width=2)
     colors = {'bus1': (220, 40, 40), 'bus3': (0, 120, 100), 'bus5': (30, 30, 30)}
-    offs = {'bus1': (-3, 0), 'bus3': (0, 0), 'bus5': (3, 0)}
-    for name, r in results.items():
-        for p in r['ink_world'][::40]:
-            x, y = tp(p)
-            dr.point((x, y), fill=tuple(int(c * 0.4 + 255 * 0.6) for c in colors[name]))
-    for name, r in results.items():
-        ox, oy = offs[name]
-        for l in r['lines']:
-            dr.line([(tp(p)[0] + ox, tp(p)[1] + oy) for p in l], fill=colors[name], width=4)
-    for code, p in (stops or {}).items():
+    offs = {'bus1': -4, 'bus3': 0, 'bus5': 4}
+    for name, pts in routes.items():
+        o = offs[name]
+        dr.line([(tp(p)[0] + o, tp(p)[1] + o) for p in pts], fill=colors[name], width=3)
+    for sid, p in stops.items():
         x, y = tp(p)
         dr.ellipse([x - 4, y - 4, x + 4, y + 4], fill=(30, 60, 200))
-        dr.text((x + 5, y - 6), code, fill=(30, 60, 200))
+        dr.text((x + 5, y - 6), sid.upper(), fill=(30, 60, 200))
     img.save(out)
+
+def uturns(nodes):
+    return [i for i in range(1, len(nodes) - 1) if nodes[i - 1] == nodes[i + 1]]
 
 
 if __name__ == '__main__':
     src = Path(sys.argv[1])
-    segs, pts = road_samples()
+    dbg = Path(sys.argv[sys.argv.index('--debug') + 1]) if '--debug' in sys.argv else None
+    segs_all, pts = road_samples()  # every road, as ICP targets
     tree = cKDTree(pts[:, :2])
-    results = {}
-    graph = road_graph(segs)
+    segs = drivable_segments()
+    print(f'{sum(s["allowed"] for s in segs)} of {len(segs)} drivable segments allowed')
+    stops, orders = read_shuttle_ts()
+    routes, results = {}, {}
     for name in ['bus1', 'bus3', 'bus5']:
+        line = name.replace('bus', '')
         a = load(src / f'{name}.jpeg')
         T0, ink, ink_px = georeference(name, a)
-        d0, _ = tree.query(apply(T0, ink_px))
         T, d = icp(T0, ink_px, tree, pts[:, :2])
-        print(f'{name}: ink px {ink.sum()}, init median {np.median(d0):.1f} m -> ICP median {np.median(d):.1f} m, p90 {np.percentile(d, 90):.1f} m')
         ys, xs = np.nonzero(ink)
-        ink_world = nonrigid(apply(T, np.stack([xs, ys], 1)), tree, pts[:, :2])
+        all_px = np.stack([xs, ys], 1).astype(float)
+        ink_world = nonrigid(apply(T, all_px), tree, pts[:, :2])
         dn, _ = tree.query(ink_world)
-        print(f'   after non-rigid: median {np.median(dn):.1f} m, p90 {np.percentile(dn, 90):.1f} m')
-        idx = members(segs, ink_world)
-        idx = prune_spurs(segs, fill_gaps(segs, idx, graph))
-        idx = prune_spurs(segs, drop_side_loops(segs, idx, cKDTree(ink_world)))
-        excluded = EXCLUDE.get(name, {})
-        idx = [i for i in idx if segs[i]['way'] not in excluded]
-        graph_ok = {k: [e for e in v if segs[e[1]]['way'] not in excluded] for k, v in graph.items()}
-        idx = prune_spurs(segs, fill_gaps(segs, idx, graph_ok))
-        for a_ll, b_ll in FORCE_LINKS.get(name, []):
-            idx = force_link(segs, graph_ok, idx, a_ll, b_ll)
-        if '--chains' in sys.argv:
-            tp = lambda q: (700 + (q[0] - 50) * 0.62, 700 - (q[1] - 100) * 0.62)
-            for chain, u, v in junction_chains(segs, set(idx)):
-                L = sum(math.dist(segs[i]['a'], segs[i]['b']) for i in chain)
-                if L < 140:
-                    ways = sorted({segs[i]['way'] for i in chain})
-                    m = tp(segs[chain[len(chain) // 2]]['a'])
-                    print(f'     chain {L:5.0f} m at render ({m[0]:.0f},{m[1]:.0f}) ways {ways}')
-        lines = chains(segs, idx)
-        total = sum(math.dist(p, q) for l in lines for p, q in zip(l, l[1:]))
-        print(f'   {len(idx)} road segments, {len(lines)} polylines, {total/1000:.2f} km')
-        results[name] = {'T': T, 'lines': lines, 'ink_world': ink_world, 'image': a}
-    stops = locate_stops(src / 'bus_way.jpeg', tree, pts[:, :2])
-    write_output(Path(sys.argv[2]), results, stops)
-    if '--debug' in sys.argv:
-        debug_render(segs, results, Path(sys.argv[sys.argv.index('--debug') + 1]), stops)
-
+        print(f'line {line}: ICP median {np.median(d):.1f} m; after non-rigid median {np.median(dn):.1f} m, p90 {np.percentile(dn, 90):.1f} m')
+        cov = coverage(segs, cKDTree(ink_world))
+        order = orders[line]
+        line_stops = {s: stops[s] for s in order}
+        snaps = snap_stops(segs, cov, line_stops, STOP_ROADS.get(line))
+        coord, adj, goals = build_graph(segs, cov, snaps)
+        try:
+            nodes, _ = trace_line(order, coord, adj, goals)
+        except SystemExit as e:
+            print('  ', e)
+            continue
+        route = [coord[n] for n in nodes]
+        routes[name] = route
+        results[name] = {'image': a, 'ink_world': ink_world, 'ink_px': all_px}
+        total = sum(math.dist(p, q) for p, q in zip(route, route[1:]))
+        print(f'   {len(route)} vertices, {total / 1000:.2f} km')
+        for i in uturns(nodes):
+            near = min(order, key=lambda sid: math.dist(stops[sid], coord[nodes[i]]))
+            print(f'   U-turn at {nodes[i] if nodes[i][0] == "stop" else "node"} ({math.dist(stops[near], coord[nodes[i]]):.0f} m from {near.upper()}), {unproj(*coord[nodes[i]])}')
+        used = {n[1]: snaps[n[1]][n[2]] for n in nodes if n[0] == 'stop'}
+        for sid in order:
+            if sid not in used:
+                print(f'   stop {sid.upper()} not reached')
+            elif used[sid]['dist'] > 15:
+                print(f'   stop {sid.upper()} is {used[sid]["dist"]:.0f} m from the route ({segs[used[sid]["seg"]]["way"]})')
+        # Review aid: stretches that are off the official ink or outside OSM's campus polygon.
+        seg_of = {}
+        for u, v in zip(nodes, nodes[1:]):
+            for w, c, i in adj.get(u, []):
+                if w == v:
+                    seg_of.setdefault(i, 0)
+                    seg_of[i] += 1
+        off = {}
+        for i in seg_of:
+            sg = segs[i]
+            L = math.dist(sg['a'], sg['b'])
+            if cov[i] < 0.3:
+                off.setdefault(('off-ink', sg['way']), 0.0)
+                off[('off-ink', sg['way'])] += L
+            if sg['outside']:
+                off.setdefault(('outside', sg['way']), 0.0)
+                off[('outside', sg['way'])] += L
+        for (kind, way), L in sorted(off.items(), key=lambda x: -x[1]):
+            if L >= 15:
+                print(f'   {kind:8s} {way:16s} {L:5.0f} m')
+        if dbg:
+            dbg.mkdir(parents=True, exist_ok=True)
+            debug_on_official(results[name], route, line_stops, dbg / f'line{line}-on-official.jpg')
+    stop_codes = locate_stops(src / 'bus_way.jpeg', tree, pts[:, :2])
+    write_output(Path(sys.argv[2]), routes, stop_codes)
+    if dbg:
+        debug_osm(segs, routes, {s: stops[s] for o in orders.values() for s in o}, dbg / 'routes-osm.png')

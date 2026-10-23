@@ -130,21 +130,27 @@ Images load lazily. A landmark without photos shows a styled placeholder.
 - Which lines serve a stop is worked out from the lines' `stops` lists, so
   there's nothing to keep in sync by hand.
 
-The route **paths** in `shuttle-paths.json` are generated. If KU publishes new
-route maps:
+The route **paths** in `shuttle-paths.json` are generated. Each line is one
+continuous loop through its stops in the order listed in `shuttle.ts`, on
+campus roads only (public roads such as Ngamwongwan, Phahonyothin and
+Vibhavadi are never used). If KU publishes new route maps, or you change a
+line's stops:
 
 ```bash
 mkdir -p .cache/shuttle && cd .cache/shuttle
 curl -O https://vehicle.ku.ac.th/index.html/wp-content/uploads/2022/06/bus1.jpeg   # and bus3, bus5, bus_way
 cd ../..
-python3 scripts/shuttle/trace_routes.py .cache/shuttle src/data/shuttle-paths.json --debug /tmp/trace.png
+python3 scripts/shuttle/trace_routes.py .cache/shuttle src/data/shuttle-paths.json --debug /tmp/trace
+npm run test:shuttle-data   # every vertex on campus, no gaps, stops within 30 m of their line
 ```
 
-This needs Python 3 with Pillow, numpy and scipy. Compare the `--debug`
-render with the official maps. Fix anything wrong with the reviewed
-`EXCLUDE` and `FORCE_LINKS` lists at the top of the script, then re-run.
-Image URLs and filenames will change with new maps, so update the
-`CONTROL_PX` pixel positions for the gate markers too.
+This needs Python 3 with Pillow, numpy and scipy. Check the renders in
+`/tmp/trace` (each route drawn back onto its official map). KU roads that
+OSM's campus polygon leaves out can be allowed, with evidence, in
+`scripts/shuttle/outside-roads.json`. Stops whose road can't be told from
+their position are pinned in `STOP_ROADS` in the script. Image URLs and
+filenames will change with new maps, so update the `CONTROL_PX` pixel
+positions for the gate markers too.
 
 > Current data: route maps dated **1 March 2022**; service hours from KU's
 > **2026** schedule. The UI states this. For live bus positions, use KU's
@@ -180,7 +186,8 @@ npm run test:touch             # Google Maps-style multi-touch gestures (CDP tou
 npm run test:desktop           # mouse, wheel, keyboard
 npm run test:webkit            # Safari engine (one-time: npx playwright-core install webkit)
 npm run test:search            # search, filters, back-gesture history, sheet snaps
-npm run test:shuttle           # shuttle overlay, lines, stops
+npm run test:shuttle           # shuttle data validation + overlay, lines, stops
+npm run test:shuttle-data      # shuttle routes only (no browser needed)
 ```
 
 You need Google Chrome installed. Set `MAP_URL` to test another address.

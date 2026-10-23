@@ -1,0 +1,10 @@
+{
+  "note": "Reviewed KU roads that OSM's campus polygon (ways 38001215, 589752219, 589752221) leaves out. The tracer may route on them and the validator accepts them. Each entry needs evidence from KU's official route maps.",
+  "ways": {
+    "way/589599724": {
+      "lines": ["5"],
+      "reason": "Bend at the east end of the E7 road, between the main campus polygon and the Vet Tech parcel (way 589752221). Unnamed highway=service, not a public road.",
+      "evidence": "bus5.jpeg (1 Mar 2022): line 5 runs east past E7 and turns south here to stops E8/E9 at the Faculty of Veterinary Technology."
+    }
+  }
+}
