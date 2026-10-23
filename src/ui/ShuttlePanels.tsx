@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { shuttleLines, shuttleStopById } from '../data/shuttle'
 import type { Lang } from '../i18n'
 import { LineDetails, LineList, LineSwatch, ShuttleSources, StopDetails } from './ShuttleInfo'
+import { CONTROLS_RESERVE, LEGEND_WIDTH } from './layout'
 import { SHEET_TOP, Sheet, useViewportHeight } from './Sheet'
 
 interface LegendProps {
@@ -13,9 +14,6 @@ interface LegendProps {
   onClose: () => void
 }
 
-/** Width of the desktop legend card (px); pins keep clear of it. */
-export const LEGEND_WIDTH = 340
-
 /** Desktop legend card (bottom-left): lines, the active line's details, sources. */
 export function ShuttleLegendCard({ activeLine, onLine, onStop, onClose }: LegendProps) {
   const { t } = useTranslation()
@@ -23,7 +21,8 @@ export function ShuttleLegendCard({ activeLine, onLine, onStop, onClose }: Legen
   return (
     <section
       aria-label={t('shuttle.title')}
-      className="pointer-events-auto absolute bottom-6 left-4 z-20 flex max-h-[calc(100%-180px)] w-[340px] flex-col rounded-3xl bg-white/97 shadow-2xl shadow-ku-900/15 ring-1 ring-black/5 backdrop-blur"
+      style={{ width: LEGEND_WIDTH }}
+      className="pointer-events-auto absolute bottom-6 left-4 z-20 flex max-h-[calc(100%-180px)] flex-col rounded-3xl bg-white/97 shadow-2xl shadow-ku-900/15 ring-1 ring-black/5 backdrop-blur"
     >
       <div className="flex items-center gap-2.5 border-b border-slate-100 px-4 py-3">
         <Bus className="size-5 text-slate-700" aria-hidden />
@@ -156,13 +155,14 @@ export function StopSheet({ stopId, activeLine, onLine, onClose, onHeight }: { s
   )
 }
 
-/** Desktop stop card at the right (same slot as the place card). */
-export function StopCard({ stopId, activeLine, onLine, onClose }: { stopId: string; activeLine: string | null; onLine: (id: string | null) => void; onClose: () => void }) {
+/** Desktop stop card at the right (same slot as the place card, left of the map controls). */
+export function StopCard({ stopId, width, activeLine, onLine, onClose }: { stopId: string; width: number; activeLine: string | null; onLine: (id: string | null) => void; onClose: () => void }) {
   const { t } = useTranslation()
   const titleId = useId()
   const stop = shuttleStopById.get(stopId)!
   return (
-    <aside aria-labelledby={titleId} aria-label={t('shuttle.stop')} className="pointer-events-auto absolute top-[132px] right-4 z-30 w-[380px] animate-[card-in_220ms_ease-out] rounded-3xl bg-white/97 p-4 shadow-2xl shadow-ku-900/15 ring-1 ring-black/5 backdrop-blur motion-reduce:animate-none">
+    <aside aria-labelledby={titleId} aria-label={t('shuttle.stop')} style={{ right: CONTROLS_RESERVE, width }}
+      className="pointer-events-auto absolute top-[132px] z-30 animate-[card-in_220ms_ease-out] rounded-3xl bg-white/97 p-4 shadow-2xl shadow-ku-900/15 ring-1 ring-black/5 backdrop-blur motion-reduce:animate-none">
       <StopDetails stop={stop} activeLine={activeLine} onLine={onLine} onClose={onClose} titleId={titleId} />
     </aside>
   )

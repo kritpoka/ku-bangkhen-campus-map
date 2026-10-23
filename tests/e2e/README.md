@@ -6,7 +6,7 @@ Automated checks for map gestures and selection. They drive the **dev server**
 ```bash
 npm run dev -- --port 5179        # in another terminal
 npm run test:touch                # multi-touch gestures, Chrome mobile emulation (26 checks)
-npm run test:desktop              # mouse + keyboard on desktop Chrome (9 checks)
+npm run test:desktop              # mouse + keyboard, controls vs. cards at 768–1440 px (12 checks)
 npm run test:webkit               # Safari engine: native taps + synthetic multi-touch (9 checks)
 npm run test:search               # search, filters, back-gesture history, sheet snaps (20 checks)
 npm run test:shuttle              # shuttle data validation, then overlay: toggle, lines, stops, chips (19 checks)

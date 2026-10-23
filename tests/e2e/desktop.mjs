@@ -41,6 +41,26 @@ const focused = await page.evaluate(() => document.activeElement?.getAttribute('
 await page.keyboard.press('Enter'); await page.waitForTimeout(1200)
 console.log('   focused before Enter:', focused, '| url:', await page.evaluate(() => location.search))
 check('keyboard: Tab to a pin + Enter selects it', !!(await url()), await url() ?? '')
+// Map controls stay put when a card opens, and cards never cover them (768–1440 px).
+for (const w of [768, 1024, 1440]) {
+  await page.setViewportSize({ width: w, height: 800 })
+  await page.goto(URL, { waitUntil: 'networkidle' })
+  await page.waitForFunction(() => window.__kuMap?.camera?.home)
+  const box = (sel) => page.locator(sel).first().evaluate((e) => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom] })
+  const nav = 'nav[aria-label="ควบคุมแผนที่"]'
+  const before = await box(nav)
+  await page.click('button[aria-label="แสดงเส้นทางรถตะลัย"]')
+  await page.click('header input[role=combobox]'); await page.keyboard.type('E12'); await page.waitForTimeout(250); await page.keyboard.press('Enter')
+  await page.waitForTimeout(600)
+  const stopCard = await box('aside'), withStop = await box(nav)
+  await page.keyboard.press('Escape')
+  await page.click('header input[role=combobox]'); await page.keyboard.type('หอสมุด'); await page.waitForTimeout(250); await page.keyboard.press('Enter')
+  await page.waitForTimeout(600)
+  const placeCard = await box('aside'), withPlace = await box(nav)
+  const apart = (a, b) => a[2] <= b[0] || b[2] <= a[0] || a[3] <= b[1] || b[3] <= a[1]
+  check(`${w} px: controls fixed and clear of the stop and place cards`,
+    JSON.stringify(before) === JSON.stringify(withStop) && JSON.stringify(before) === JSON.stringify(withPlace) && apart(stopCard, withStop) && apart(placeCard, withPlace))
+}
 check('no page errors', errors.length === 0, errors.join(' | '))
 console.log(`${res.filter(Boolean).length}/${res.length} passed`)
 await browser.close()

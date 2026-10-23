@@ -10,7 +10,8 @@ const CampusMap = lazy(() => import('./scene/CampusMap').then((m) => ({ default:
 import { pinBridge } from './scene/pinBridge'
 import { Attribution } from './ui/Attribution'
 import { BottomSheet, placeSnaps } from './ui/BottomSheet'
-import { CARD_MARGIN, CARD_WIDTH, DetailCard } from './ui/DetailCard'
+import { DetailCard } from './ui/DetailCard'
+import { CARD_MARGIN, CONTROLS_RESERVE, LEGEND_WIDTH, cardWidth, useViewportWidth } from './ui/layout'
 import { Header } from './ui/Header'
 import { MapControls } from './ui/MapControls'
 import { MobileSearch } from './ui/MobileSearch'
@@ -23,7 +24,7 @@ import { useSelection } from './ui/useSelection'
 import { shuttleLines, shuttleStopById, shuttleStops } from './data/shuttle'
 import { stopBridge } from './scene/stopBridge'
 import { StopLayer } from './ui/StopLayer'
-import { LEGEND_WIDTH, LineChips, LineSheet, ShuttleLegendCard, StopCard, StopSheet } from './ui/ShuttlePanels'
+import { LineChips, LineSheet, ShuttleLegendCard, StopCard, StopSheet } from './ui/ShuttlePanels'
 import './ui/shuttleSearch'
 
 /** Camera distance (m) when focusing a place; closer views are kept. */
@@ -137,7 +138,8 @@ export default function App() {
       if (isDesktop) {
         mapApi.flyTo(x, z, {
           distance: Math.min(current, FOCUS_DISTANCE.desktop),
-          sx: (w - CARD_WIDTH - CARD_MARGIN * 2) / 2,
+          // Between the shuttle legend (if shown) and the card.
+          sx: (pinBridge.insets.left + w - cardWidth(w, pinBridge.insets.left > 0) - CONTROLS_RESERVE - CARD_MARGIN) / 2,
           sy: h * 0.56,
         })
       } else {
@@ -166,16 +168,18 @@ export default function App() {
   const mobileLine = !isDesktop && !selected && !stop && activeLine ? activeLine : null
   const sheetOpen = !isDesktop && (!!selected || !!stop || !!mobileLine)
   const rightCard = isDesktop && (!!selected || !!stop)
+  const vw = useViewportWidth()
+  const cw = cardWidth(vw, shuttleOn)
 
   // Keep pins and stops out from under the card (desktop), sheets or search bar (mobile).
   useEffect(() => {
-    pinBridge.insets.right = rightCard ? CARD_WIDTH + CARD_MARGIN * 2 : 0
+    pinBridge.insets.right = rightCard ? cw + CONTROLS_RESERVE + CARD_MARGIN : 0
     pinBridge.insets.left = isDesktop && shuttleOn ? LEGEND_WIDTH + 16 : 0
     if (isDesktop) pinBridge.insets.bottom = 0
     else if (!sheetOpen) pinBridge.insets.bottom = searchBarHeight.current
     pinBridge.touch()
     stopBridge.touch()
-  }, [isDesktop, rightCard, sheetOpen, shuttleOn])
+  }, [isDesktop, rightCard, sheetOpen, shuttleOn, cw])
 
   const onSearchBarHeight = useCallback(
     (px: number) => {
@@ -265,24 +269,22 @@ export default function App() {
       </div>
       <Header isDesktop={isDesktop} chips={chips} onChips={onChips} categories={categories} onPick={pick} />
       <MapControls
-        className={`absolute z-20 transition-[right] duration-200 motion-reduce:transition-none ${
-          isDesktop ? 'top-1/2 -translate-y-1/2' : 'top-[84px]'
-        }`}
-        style={{ right: rightCard ? CARD_WIDTH + CARD_MARGIN * 2 : isDesktop ? 16 : 12 }}
+        // Fixed: cards open to the left of this column (layout.ts), so it never moves.
+        className={`absolute z-20 ${isDesktop ? 'top-1/2 right-4 -translate-y-1/2' : 'top-[84px] right-3'}`}
         shuttleOn={shuttleOn}
         onToggleShuttle={toggleShuttle}
       />
       {isDesktop && shuttleOn && (
         <ShuttleLegendCard activeLine={activeLine} onLine={setActiveLine} onStop={(id) => selectStop(id, true)} onClose={toggleShuttle} />
       )}
-      {isDesktop && stop && !selected && <StopCard stopId={stop.id} activeLine={activeLine} onLine={setActiveLine} onClose={() => setStopId(null)} />}
+      {isDesktop && stop && !selected && <StopCard stopId={stop.id} width={cw} activeLine={activeLine} onLine={setActiveLine} onClose={() => setStopId(null)} />}
       {!isDesktop && stop && !selected && (
         <StopSheet stopId={stop.id} activeLine={activeLine} onLine={setActiveLine} onClose={() => setStopId(null)} onHeight={onSheetHeight} />
       )}
       {mobileLine && <LineSheet lineId={mobileLine} onClose={() => setActiveLine(null)} onStop={(id) => selectStop(id, true)} onHeight={onSheetHeight} />}
       {selected &&
         (isDesktop ? (
-          <DetailCard landmark={selected} onClose={close} onFocus={refocus} />
+          <DetailCard landmark={selected} width={cw} onClose={close} onFocus={refocus} />
         ) : (
           <BottomSheet landmark={selected} onClose={close} onFocus={refocus} onHeight={onSheetHeight} />
         ))}
