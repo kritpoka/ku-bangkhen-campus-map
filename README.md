@@ -28,6 +28,7 @@ npm run dev            # http://localhost:5173
 npm run dev -- --host  # also reachable from your phone on the same Wi-Fi
 npm run build          # production build in dist/
 npm run preview        # serve dist/ locally
+node scripts/og-image.mjs  # re-render public/og-image.jpg (dev server running); bump ?v= in index.html
 npm run typecheck
 ```
 
