@@ -14,6 +14,8 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as turf from '@turf/turf'
+import { topology } from 'topojson-server'
+import { quantize } from 'topojson-client'
 import type { Feature, FeatureCollection, LineString, MultiPolygon, Point, Polygon, Position } from 'geojson'
 
 const OSM_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'data', 'osm')
@@ -26,6 +28,10 @@ const TREE_RATE_OUT = 0.06
 const FADE_GRID = 160
 /** Distance outside the campus over which the surroundings fade out (m). */
 const FADE_DISTANCE_M = 260
+/** Context features entirely farther out than this are invisible (fully faded) and dropped. */
+const KEEP_DISTANCE_M = FADE_DISTANCE_M + 10
+/** TopoJSON quantisation: 1e5 steps across the ~2.5 km bbox ≈ 2.5 cm. */
+const QUANTIZATION = 1e5
 
 type Area = Feature<Polygon | MultiPolygon, { inside: boolean; [k: string]: unknown }>
 
@@ -197,6 +203,24 @@ export async function derive() {
     })
 
   const campus = new PolygonIndex(projPolys([boundary]), 200)
+  const boundaryRings = projPolys([boundary])
+  const distanceOutside = (p: [number, number]) => {
+    if (campus.hit(p)) return 0
+    let d = Infinity
+    for (const rings of boundaryRings) d = Math.min(d, distToRings(p, rings))
+    return d
+  }
+  /** Keep a feature if any vertex is inside or within KEEP_DISTANCE_M of the campus. */
+  const visible = (f: Feature) => {
+    const g = f.geometry
+    const coords: Position[] =
+      g.type === 'Polygon' ? g.coordinates.flat()
+      : g.type === 'MultiPolygon' ? g.coordinates.flat(2)
+      : g.type === 'LineString' ? g.coordinates
+      : g.type === 'MultiLineString' ? g.coordinates.flat()
+      : []
+    return coords.some((c) => distanceOutside(P.to(c)) <= KEEP_DISTANCE_M)
+  }
   const blocked = new PolygonIndex(
     projPolys([...buildings.features, ...sport.features, ...water.features.filter((f) => f.geometry.type !== 'LineString')]),
   )
@@ -249,6 +273,7 @@ export async function derive() {
       )
       if (score === 0) continue
       const isIn = campus.hit(p)
+      if (!isIn && distanceOutside(p) > KEEP_DISTANCE_M) continue
       const clump = 0.15 + 1.4 * noise(p[0], p[1])
       if (rand() > score * clump * (isIn ? TREE_RATE_IN : TREE_RATE_OUT)) continue
       const [lng, lat] = P.from(p)
@@ -289,6 +314,35 @@ export async function derive() {
       data: Buffer.from(mask).toString('base64'),
     }) + '\n',
   )
+  // --- Compact topology for the app -------------------------------------
+  // The app loads this single TopoJSON (shared arcs, quantised, invisible
+  // context dropped) instead of the raw per-layer GeoJSON files above.
+  const layers = { buildings, roads, water, green, sport }
+  const objects: Record<string, FeatureCollection | Feature> = { boundary }
+  const kept: Record<string, string> = {}
+  // Only the properties the renderer reads (see src/scene); names etc. stay in the raw files.
+  const KEEP: Record<string, string[]> = {
+    buildings: ['id', 'inside', 'building', 'building:levels', 'height'],
+    roads: ['inside', 'class', 'service'],
+    water: ['inside'],
+    green: ['inside', 'leisure', 'natural'],
+    sport: ['id', 'inside', 'leisure', 'sport'],
+  }
+  const slim = (f: Feature, keys: string[]): Feature => {
+    const p = (f.properties ?? {}) as Record<string, unknown>
+    return { type: 'Feature', geometry: f.geometry, properties: Object.fromEntries(keys.filter((k) => p[k] !== undefined).map((k) => [k, p[k]])) }
+  }
+  for (const [name, fc] of Object.entries(layers)) {
+    const features = (fc.features as Feature[])
+      .filter((f) => (f.properties as { inside?: boolean })?.inside || visible(f))
+      .map((f) => slim(f, KEEP[name]))
+    objects[name] = { type: 'FeatureCollection', features }
+    kept[name] = `${features.length}/${fc.features.length}`
+  }
+  const topo = quantize(topology(objects as Parameters<typeof topology>[0]) as unknown as Parameters<typeof quantize>[0], QUANTIZATION)
+  await writeFile(join(OSM_DIR, 'campus.topo.json'), JSON.stringify(topo) + '\n')
+  console.log('Topology kept (visible/total):', kept)
+
   console.log('Derived trees:', { osm: osmTrees.features.length, inside, outside }, 'and fade mask', `${FADE_GRID}²`)
 }
 

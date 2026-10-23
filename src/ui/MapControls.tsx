@@ -1,7 +1,7 @@
 import { Bus, House, Minus, Plus } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { mapCamera } from '../scene/camera/mapCamera'
+import { mapApi } from '../scene/mapApi'
 
 /** Bearing (radians) beyond which the compass appears. */
 const COMPASS_THRESHOLD = (2 * Math.PI) / 180
@@ -29,13 +29,13 @@ export function MapControls({
     <nav aria-label={t('controls.label')} className={`flex flex-col items-end gap-2 ${className}`} style={style}>
       <Compass />
       <div className="flex flex-col divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white/95 shadow-lg shadow-ku-900/10 ring-1 ring-black/5 backdrop-blur">
-        <button type="button" className={buttonClass} aria-label={t('controls.zoomIn')} title={t('controls.zoomIn')} onClick={() => mapCamera.zoomStep(0.5)}>
+        <button type="button" className={buttonClass} aria-label={t('controls.zoomIn')} title={t('controls.zoomIn')} onClick={() => mapApi.zoomStep(0.5)}>
           <Plus className="size-5" aria-hidden />
         </button>
-        <button type="button" className={buttonClass} aria-label={t('controls.zoomOut')} title={t('controls.zoomOut')} onClick={() => mapCamera.zoomStep(2)}>
+        <button type="button" className={buttonClass} aria-label={t('controls.zoomOut')} title={t('controls.zoomOut')} onClick={() => mapApi.zoomStep(2)}>
           <Minus className="size-5" aria-hidden />
         </button>
-        <button type="button" className={buttonClass} aria-label={t('controls.home')} title={t('controls.home')} onClick={() => mapCamera.goHome()}>
+        <button type="button" className={buttonClass} aria-label={t('controls.home')} title={t('controls.home')} onClick={() => mapApi.goHome()}>
           <House className="size-5" aria-hidden />
         </button>
       </div>
@@ -66,7 +66,7 @@ function Compass() {
 
   useEffect(
     () =>
-      mapCamera.subscribe((azimuth) => {
+      mapApi.subscribe((azimuth) => {
         const a = Math.atan2(Math.sin(azimuth), Math.cos(azimuth))
         if (needle.current) needle.current.style.transform = `rotate(${a}rad)`
         setVisible(Math.abs(a) > COMPASS_THRESHOLD)
@@ -77,7 +77,7 @@ function Compass() {
   return (
     <button
       type="button"
-      onClick={() => mapCamera.resetBearing()}
+      onClick={() => mapApi.resetBearing()}
       aria-label={t('controls.compass')}
       title={t('controls.compass')}
       tabIndex={visible ? 0 : -1}

@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { mapApi } from '../mapApi'
 
 /**
  * Map-style camera model shared by touch gestures, animations (fly-to, zoom
@@ -32,8 +33,6 @@ interface Controls {
   update(): boolean | void
 }
 
-type Listener = (azimuth: number, polar: number) => void
-
 const reducedMotion = () =>
   typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -46,7 +45,7 @@ const easeOutCubic = (t: number) => 1 - (1 - t) ** 3
 const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2)
 const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a))
 
-class MapCamera {
+export class MapCamera {
   private camera: THREE.PerspectiveCamera | null = null
   private controls: Controls | null = null
   private invalidate: () => void = () => {}
@@ -80,7 +79,6 @@ class MapCamera {
   private sph = new THREE.Spherical()
   private holds = 0
   private anim: { cancel: () => void } | null = null
-  private listeners = new Set<Listener>()
   private lastPublished = { azimuth: NaN, polar: NaN }
 
   attach(opts: {
@@ -135,13 +133,7 @@ class MapCamera {
     if (Math.abs(azimuth - this.lastPublished.azimuth) < 1e-4 && Math.abs(polar - this.lastPublished.polar) < 1e-4) return
     this.lastPublished.azimuth = azimuth
     this.lastPublished.polar = polar
-    for (const l of this.listeners) l(azimuth, polar)
-  }
-
-  subscribe(l: Listener) {
-    this.listeners.add(l)
-    if (!Number.isNaN(this.lastPublished.azimuth)) l(this.lastPublished.azimuth, this.lastPublished.polar)
-    return () => void this.listeners.delete(l)
+    mapApi.notify(azimuth, polar)
   }
 
   private scratchState: OrbitState = { target: new THREE.Vector3(), distance: 0, azimuth: 0, polar: 0 }
@@ -342,6 +334,11 @@ class MapCamera {
       end.target.z += point.z - probe.z
     }
     this.animateTo(end, opts.duration ?? 950)
+  }
+
+  /** flyTo for callers without three.js (the UI shell, via mapApi). */
+  flyToXZ(x: number, z: number, opts: { distance: number; sx?: number; sy?: number; duration?: number }) {
+    this.flyTo(new THREE.Vector3(x, 0, z), opts)
   }
 
   /** Back to north-up and the default tilt, around the current centre. */

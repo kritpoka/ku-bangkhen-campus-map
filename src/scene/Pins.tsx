@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import type { Landmark } from '../data/types'
 import { toScene } from '../lib/geo'
 import { pinBridge } from './pinBridge'
+import { labelText } from '../ui/labels'
 
 /**
  * How a pin is drawn. A pin is either a label (chip + stem + dot) or just a
@@ -41,8 +42,6 @@ function textWidth(text: string): number {
   return measureCtx.measureText(text).width
 }
 
-/** The text a map label shows. */
-export const labelText = (l: Landmark, lang: 'th' | 'en') => (l.shortName ?? l.name)[lang]
 
 /**
  * Projects landmark anchors to the screen and decides which get labels: by

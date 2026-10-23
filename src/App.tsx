@@ -1,12 +1,12 @@
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import * as THREE from 'three'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { landmarkById, landmarks } from './data/landmarks'
 import type { Landmark } from './data/types'
 import { toScene } from './lib/geo'
-import { mapCamera } from './scene/camera/mapCamera'
-import { attachTouchGestures } from './scene/camera/touchGestures'
-import { CampusMap } from './scene/CampusMap'
+import { mapApi } from './scene/mapApi'
+import { MapSkeleton } from './ui/MapSkeleton'
+
+// three.js + the scene + OSM data load as a separate chunk after the UI shell.
+const CampusMap = lazy(() => import('./scene/CampusMap').then((m) => ({ default: m.CampusMap })))
 import { pinBridge } from './scene/pinBridge'
 import { Attribution } from './ui/Attribution'
 import { BottomSheet, placeSnaps } from './ui/BottomSheet'
@@ -30,7 +30,6 @@ import './ui/shuttleSearch'
 const FOCUS_DISTANCE = { desktop: 460, mobile: 560 }
 
 export default function App() {
-  const { t } = useTranslation()
   const isDesktop = useMediaQuery(DESKTOP_QUERY)
   const [selectedId, select] = useSelection()
   const selected = selectedId ? landmarkById.get(selectedId) ?? null : null
@@ -71,8 +70,7 @@ export default function App() {
 
   const flyToPoint = useCallback((lng: number, lat: number, distance: number) => {
     const [x, z] = toScene(lng, lat)
-    const current = mapCamera.ready ? mapCamera.read().distance : Infinity
-    mapCamera.flyTo(new THREE.Vector3(x, 0, z), { distance: Math.min(current, distance) })
+    mapApi.flyTo(x, z, { distance: Math.min(mapApi.distance(), distance) })
   }, [])
 
   // A stop and a place are never both open.
@@ -129,9 +127,9 @@ export default function App() {
     (l: Landmark) => {
       const [x, z] = toScene(l.coordinates.lng, l.coordinates.lat)
       const { innerWidth: w, innerHeight: h } = window
-      const current = mapCamera.ready ? mapCamera.read().distance : Infinity
+      const current = mapApi.distance()
       if (isDesktop) {
-        mapCamera.flyTo(new THREE.Vector3(x, 0, z), {
+        mapApi.flyTo(x, z, {
           distance: Math.min(current, FOCUS_DISTANCE.desktop),
           sx: (w - CARD_WIDTH - CARD_MARGIN * 2) / 2,
           sy: h * 0.56,
@@ -139,7 +137,7 @@ export default function App() {
       } else {
         const top = pinBridge.insets.top
         const bottom = h - (sheetHeight.current || placeSnaps(h)[1])
-        mapCamera.flyTo(new THREE.Vector3(x, 0, z), {
+        mapApi.flyTo(x, z, {
           distance: Math.min(current, FOCUS_DISTANCE.mobile),
           sx: w / 2,
           sy: top + (bottom - top) * 0.62,
@@ -153,7 +151,7 @@ export default function App() {
   useEffect(() => {
     if (!selected) return
     let raf = 0
-    const go = () => (mapCamera.ready && mapCamera.home ? focus(selected) : (raf = requestAnimationFrame(go)))
+    const go = () => (mapApi.ready ? focus(selected) : (raf = requestAnimationFrame(go)))
     go()
     return () => cancelAnimationFrame(raf)
   }, [selected, focus])
@@ -191,13 +189,6 @@ export default function App() {
     pinBridge.touch()
     stopBridge.touch()
   }, [])
-
-  // Touch: Google Maps–style gestures. A tap selects the pin under it, or clears the selection.
-  useEffect(() => {
-    const el = mapRef.current
-    if (!el) return
-    return attachTouchGestures(el, { onTap: tapAt })
-  }, [tapAt])
 
   // Mouse: a click (not a drag) selects the pin under the cursor, or clears the
   // selection on empty map. Hovering a pin shows a pointer cursor.
@@ -255,8 +246,9 @@ export default function App() {
         ref={mapRef}
         className="absolute inset-0 touch-none select-none [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none]"
       >
-        <Suspense fallback={<p className="p-6 text-sm text-ku-700">{t('app.loading')}</p>}>
-          <CampusMap shuttleOn={shuttleOn} activeLine={activeLine} />
+        <Suspense fallback={<MapSkeleton />}>
+          {/* Touch gestures attach inside the scene chunk (they drive the camera controller). */}
+          <CampusMap shuttleOn={shuttleOn} activeLine={activeLine} gestureTarget={mapRef} onTap={tapAt} />
         </Suspense>
         <PinLayer landmarks={landmarks} selectedId={selectedId} onSelect={selectPlace} />
         {shuttleOn && <StopLayer selectedId={stopId} onSelect={(id) => selectStop(id)} />}

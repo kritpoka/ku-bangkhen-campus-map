@@ -13,6 +13,8 @@ import { StopProjector } from './StopProjector'
 import { pinBridge } from './pinBridge'
 import { stopBridge } from './stopBridge'
 import { mapCamera } from './camera/mapCamera'
+import { attachTouchGestures } from './camera/touchGestures'
+import { mapApi } from './mapApi'
 import { Trees } from './Trees'
 import { palette } from './palette'
 import { pinHeights } from './pinAnchors'
@@ -66,7 +68,11 @@ function CameraRig({ controls }: { controls: React.RefObject<OrbitControlsImpl |
     if (!c) return
     mapCamera.attach({ camera: camera as THREE.PerspectiveCamera, controls: c, invalidate, getSize: () => get().size })
     mapCamera.defaultPolar = DEFAULT_POLAR
-    return () => mapCamera.detach()
+    mapApi.connect(mapCamera)
+    return () => {
+      mapApi.disconnect()
+      mapCamera.detach()
+    }
   }, [camera, controls, invalidate, get])
 
   // Frame the campus on first load; refresh limits whenever the viewport changes.
@@ -225,9 +231,19 @@ function Scene({ shuttleOn, activeLine }: CampusMapProps) {
 interface CampusMapProps {
   shuttleOn: boolean
   activeLine: string | null
+  /** Element that receives Google Maps–style touch gestures (the map container). */
+  gestureTarget?: React.RefObject<HTMLElement | null>
+  onTap?: (x: number, y: number) => void
 }
 
-export function CampusMap(props: CampusMapProps) {
+export function CampusMap({ gestureTarget, onTap, ...props }: CampusMapProps) {
+  const tapRef = useRef(onTap)
+  tapRef.current = onTap
+  useEffect(() => {
+    const el = gestureTarget?.current
+    if (!el) return
+    return attachTouchGestures(el, { onTap: (x, y) => tapRef.current?.(x, y) })
+  }, [gestureTarget])
   return (
     <Canvas
       shadows={{ type: THREE.PCFShadowMap }}

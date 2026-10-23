@@ -2,7 +2,7 @@ import { memo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Landmark } from '../data/types'
 import type { Lang } from '../i18n'
-import { labelText } from '../scene/Pins'
+import { labelText } from './labels'
 import { pinBridge } from '../scene/pinBridge'
 import { categoryStyle } from './categories'
 

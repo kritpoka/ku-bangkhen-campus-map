@@ -6,4 +6,6 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   base: process.env.BASE_PATH ?? '/',
   plugins: [react(), tailwindcss()],
+  // JSON imports become JSON.parse('…') strings: much faster to parse than object literals.
+  json: { stringify: true },
 })
